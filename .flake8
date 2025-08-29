@@ -1,0 +1,13 @@
+[flake8]
+exclude =
+    .venv,
+    venv,
+    .git,
+    __pycache__,
+    *.min.js,
+    *.min.css,
+    build,
+    dist,
+    migrations
+ignore = E501,E503,W503,F401
+max-line-length = 119
