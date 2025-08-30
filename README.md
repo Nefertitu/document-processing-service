@@ -255,4 +255,4 @@ curl http://89.169.166.189/users/ \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-## Приложение развернуто на VM на server-ip: http://89.169.166.189/
+## Приложение развернуто на VM на server-ip: http://89.169.166.189/ 

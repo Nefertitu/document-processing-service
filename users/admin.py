@@ -11,10 +11,12 @@ class UserAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "email",
-        "name",
+        "first_name",
+        "last_name",
     )
     list_filter = ("email",)
     search_fields = (
         "email",
-        "name",
+        "first_name",
+        "last_name",
     )

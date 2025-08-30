@@ -11,6 +11,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "email",
-            "name",
+            "first_name",
+            "last_name",
             "avatar",
         )

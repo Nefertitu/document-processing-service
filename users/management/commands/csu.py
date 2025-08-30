@@ -12,18 +12,22 @@ class Command(BaseCommand):
     help = "Создает кастомного суперпользователя"
 
     def handle(self, *args: Any, **options: Any) -> None:
-        """Добавляет суперпользователю email и пароль"""
+        """Добавляет суперпользователю email, имя и пароль"""
 
         User = get_user_model()
         email = os.getenv("SUPERUSER_EMAIL", "superuser@example.com")
         password = os.getenv("SUPERUSER_PASSWORD", "123qwer")
+        first_name = os.getenv("SUPERUSER_NAME", "superuser")
 
         if not User.objects.filter(email=email).exists():
-            user = User.objects.create(email=email)
-            user.set_password(password=password)
-            user.is_active = True
-            user.is_staff = True
-            user.is_superuser = True
+            user = User.objects.create(
+                email=email,
+                first_name=first_name,
+                is_active=True,
+                is_staff=True,
+                is_superuser=True,
+            )
+            user.set_password(password)
             user.save()
             self.stdout.write(self.style.SUCCESS(f"Successfully created user with email {user.email}!"))
         else:
