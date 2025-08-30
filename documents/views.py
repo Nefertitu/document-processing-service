@@ -1,8 +1,21 @@
+from typing import Any, Sequence, Union
+
+from django.db.models import QuerySet
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.request import Request
+from rest_framework.serializers import BaseSerializer
+from rest_framework import permissions
+from rest_framework.permissions import BasePermission, IsAuthenticated, OperandHolder, SingleOperandHolder
+
+
 from .models import Document
 from .permissions import IsOwnerOrAdmin, CanApproveDocument, CanRejectDocument
+from documents.serializers import DocumentSerializer
+
+from .tasks import send_document_status_email
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -14,7 +27,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     PermissionClass = Union[type[BasePermission], OperandHolder, SingleOperandHolder]
 
-    def get_queryset(self) -> QuerySet[Habit] | None:
+    def get_queryset(self) -> QuerySet[Document] | None:
         """
         Фильтрует документы в зависимости от прав пользователя.
         Пользователь видит только свои документа, админ - все.
@@ -26,21 +39,37 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return Document.objects.filter(owner=user)
 
     @action(detail=True, methods=["post"], permission_classes=[CanApproveDocument])
-    def approve(self, request, pk=None):
-        """Действие подтверждения документа"""
+    def approve(self, request: Request, pk=None) -> Response:
+        """Действие подтверждения документа и добавления задачи в очередь Celery"""
+
         document = self.get_object()
         document.status = "approved"
         document.reviewed_by = request.user
         document.save()
+
+        send_document_status_email.delay(
+            document_id=document.pk,
+            status="approved",
+            comment=document.review_comment
+        )
+
         return Response({"status": "approved"}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], permission_classes=[CanRejectDocument])
     def reject(self, request, pk=None):
         """Действие отклонения документа"""
+
         document = self.get_object()
         document.status = "rejected"
         document.reviewed_by = request.user
         document.save()
+
+        send_document_status_email.delay(
+            document_id=document.pk,
+            status="rejected",
+            comment=document.review_comment
+        )
+
         return Response({"status": "rejected"}, status=status.HTTP_200_OK)
 
     def get_permissions(self) -> Sequence[Any]:
@@ -78,7 +107,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
         print(f"Создан документ: {document}")
 
         if self.request.user.email:
-            send_information.delay(self.request.user.email)
+            send_document_status_email.delay(
+                document_id=document.pk,
+                status="pending",
+        )
         else:
             print("У пользователя нет email, уведомление не отправлено")
 

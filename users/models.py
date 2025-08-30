@@ -40,6 +40,11 @@ class User(AbstractUser):
         verbose_name_plural = "Пользователи"
         ordering = ["last_name", "first_name"]
 
+        permissions = [
+            ("can_view_all_users", "Может видеть всех пользователей"),
+            ("can_delete_user", "Может удалять пользователей"),
+        ]
+
 
     @property
     def full_name(self):

@@ -117,7 +117,7 @@ class Document(models.Model):
 
     def __str__(self) -> str:
         """Строковое отображение модели Документ"""
-        return f"{self.title} ({self.owner.name}, {self.owner.email})"
+        return f"{self.title} ({self.owner.first_name}, {self.owner.email})"
 
     def intelligible_file_path(instance, filename):
         """Сохраняем по дате, но логически группируем через модель"""

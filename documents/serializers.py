@@ -3,8 +3,8 @@ from typing import Optional
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from habits.models import Habit
-from habits.validators import FrequencyValidator, LeadTimeValidator, RequiredFieldTimeValidator, RewardHabitValidator
+from documents.models import Folder, Document
+# from habits.validators import FrequencyValidator, LeadTimeValidator, RequiredFieldTimeValidator, RewardHabitValidator
 
 
 class FolderSerializer(serializers.ModelSerializer):

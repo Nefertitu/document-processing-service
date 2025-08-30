@@ -13,6 +13,17 @@ class HasOwner(Protocol):
     user: User
 
 
+class IsOwnerOnly(permissions.BasePermission):
+    """Разрешение только для владельца объекта"""
+
+    def has_object_permission(self, request: Request, view: Any, obj: HasOwner) -> bool:
+        """Проверяет, является ли пользователь владельцем объекта"""
+
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return hasattr(obj, "owner") and obj.owner == request.user
+
+
 class IsOwnerOrAdmin(permissions.BasePermission):
     """Разрешение только для владельца документа"""
 

@@ -218,4 +218,9 @@ CSRF_TRUSTED_ORIGINS = [
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+HEALTH_CHECK = {
+    'DISK_USAGE_MAX': 90,  # Максимальное использование диска в %
+    'MEMORY_MIN': 100,     # Минимальная свободная память в MB
+}
+
 
