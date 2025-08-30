@@ -56,6 +56,11 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     #other apps
+    "health_check",
+    "health_check.db",
+    "health_check.cache",
+    "health_check.storage",
+    "health_check.contrib.celery",
     "rest_framework",
     "django_filters",
     "rest_framework_simplejwt",

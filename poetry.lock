@@ -561,6 +561,26 @@ files = [
 Django = ">=4.2"
 
 [[package]]
+name = "django-health-check"
+version = "3.20.0"
+description = "Monitor the health of your Django app and its connected services."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "django_health_check-3.20.0-py3-none-any.whl", hash = "sha256:bcb2b8f36f463cead0564a028345c5b17e2a2d18e9cc88ecd611b13a26521926"},
+    {file = "django_health_check-3.20.0.tar.gz", hash = "sha256:cd69ac5facf73fe7241d9492d939b57bd20e24f46c4edea91e6a900bf22c2d8e"},
+]
+
+[package.dependencies]
+Django = ">=4.2"
+
+[package.extras]
+docs = ["sphinx"]
+lint = ["ruff (==0.11.13)"]
+test = ["boto3", "celery", "django-storages", "pytest", "pytest-cov", "pytest-django", "redis"]
+
+[[package]]
 name = "django-stubs"
 version = "5.2.2"
 description = "Mypy stubs for Django"
@@ -1861,4 +1881,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.13"
-content-hash = "e92d955606767517da7606d7d49ada86517bd9866c69be3633b52747e1b49184"
+content-hash = "460cb8aea7e0f2700250f59ab422837f41870f197247d2efc1f67f618f1c7a65"

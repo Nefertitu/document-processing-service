@@ -13,8 +13,8 @@ from rest_framework.permissions import BasePermission, IsAuthenticated, OperandH
 
 from .models import Document
 from .permissions import IsOwnerOrAdmin, CanApproveDocument, CanRejectDocument
-from documents.serializers import DocumentSerializer
-
+from .serializers import DocumentSerializer
+from .paginators import DocumentPaginator
 from .tasks import send_document_status_email
 
 
@@ -23,7 +23,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     serializer_class = DocumentSerializer
     permission_classes = [IsOwnerOrAdmin]
-    # pagination_class = DocumentPaginator
+    pagination_class = DocumentPaginator
 
     PermissionClass = Union[type[BasePermission], OperandHolder, SingleOperandHolder]
 
