@@ -1,10 +1,9 @@
 from typing import Any, Protocol
 
-from rest_framework import permissions
-from rest_framework.request import Request
-
 from django.core.exceptions import PermissionDenied
 from django.views import View
+from rest_framework import permissions
+from rest_framework.request import Request
 
 from users.models import User
 
@@ -60,6 +59,4 @@ class CanRejectDocument(permissions.BasePermission):
     def has_object_permission(self, request: Request, view: View, obj: Any) -> bool:
         """Проверка права на уровне объекта"""
         return request.user.has_perm("documents.can_reject_document")
-
-
 

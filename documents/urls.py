@@ -1,17 +1,18 @@
-from django.urls import path
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from documents.apps import DocumentsConfig
-from documents.views import (
-    DocumentViewSet,
-)
+from .apps import DocumentsConfig
+from .views import ApprovalQueueViewSet, DocumentViewSet, FolderViewSet, QueueItemViewSet
 
 app_name = DocumentsConfig.name
 
 
 router = DefaultRouter()
-router.register(r"", DocumentViewSet, basename="documents")
+router.register(r"folders", FolderViewSet, basename="folder")
+router.register(r"queues", ApprovalQueueViewSet, basename="approvalqueue")
+router.register(r"queue_items", QueueItemViewSet, basename="queueitem")
+router.register(r"", DocumentViewSet, basename="document")
 
 urlpatterns = [
-
-] + router.urls
+    path("", include(router.urls)),
+]

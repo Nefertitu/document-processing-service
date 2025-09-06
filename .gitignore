@@ -6,6 +6,17 @@ __pycache__/
 # C extensions
 *.so
 
+# Игнорировать всё в media кроме .gitkeep файлов
+media/*
+!media/.gitkeep
+!media/*/.gitkeep
+!media/*/*/.gitkeep
+
+# Конкретные исключения для структуры
+!media/documents/.gitkeep
+!media/temp_uploads/.gitkeep
+!media/temp_answers/.gitkeep
+
 # Distribution / packaging
 .Python
 build/
@@ -170,3 +181,4 @@ cython_debug/
 #node_modules/
 #npm-debug.log
 #.yarn-integrity
+media/temp_*

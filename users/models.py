@@ -45,14 +45,26 @@ class User(AbstractUser):
             ("can_delete_user", "Может удалять пользователей"),
         ]
 
-
     @property
     def full_name(self):
         """Возвращает полное имя"""
         if self.last_name:
             return f"{self.first_name} {self.last_name}"
-        return self.first_name
+        return f"{self.first_name}"
 
     def __str__(self) -> str:
         """Строковое представление объекта пользователя"""
-        return f"{self.full_name} ({self.email})"
+        return f"{self.first_name} {self.last_name} ({self.email})"
+
+    # @property
+    # def queue_size(self) -> int:
+    #     """Количество документов в очереди администратора"""
+    #     if hasattr(self, "approval_queue"):
+    #         return self.approval_queue.items.count()
+    #     return 0
+    #
+    # def get_queue_documents(self):
+    #     """Документы в очереди администратора"""
+    #     if hasattr(self, "approval_queue"):
+    #         return self.approval_queue.items.order_by("position")
+    #     return QueueItem.objects.none()

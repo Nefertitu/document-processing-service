@@ -9,12 +9,12 @@ User = get_user_model()
 
 class Command(BaseCommand):
     """Команда для создания администратора с данными из переменных окружения"""
-    
+
     help = "Создает администратора из переменных окружения"
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Добавляет администратору email, имя и пароль"""
-        
+
         email = os.getenv("ADMIN_EMAIL")
         password = os.getenv("ADMIN_PASSWORD")
         first_name = os.getenv("ADMIN_FIRST_NAME")

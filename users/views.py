@@ -1,14 +1,13 @@
 from typing import Any, List
 
+from django.db.models import QuerySet
 from rest_framework import permissions, serializers, viewsets
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.serializers import BaseSerializer
 
-from django.db.models import QuerySet
-
 from .models import User
-from .permissions import IsSelfOnly, CanViewAllUsers, CanDeleteUsers
+from .permissions import CanDeleteUsers, CanViewAllUsers, IsSelfOnly
 from .serializers import UserProfileSerializer
 
 
@@ -17,14 +16,12 @@ class UserCreateApiView(CreateAPIView):
 
     serializer_class = UserProfileSerializer
     queryset = User.objects.all()
-    permission_classes = (AllowAny,)
+    permission_classes = [permissions.AllowAny]
 
     def perform_create(self, serializer: BaseSerializer[Any]) -> None:
         """Метод для создания профиля пользователя (POST /register/)"""
 
-        user = serializer.save(is_active=True)
-        user.set_password(user.password)
-        user.save()
+        serializer.save(is_active=True)
 
 
 class UserProfileViewSet(viewsets.ModelViewSet):
@@ -64,6 +61,3 @@ class UserProfileViewSet(viewsets.ModelViewSet):
         if self.request.user.has_perm("users.view_all_users"):
             return User.objects.all()
         return User.objects.filter(pk=self.request.user.id)
-
-
-

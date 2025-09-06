@@ -1,10 +1,9 @@
 from typing import Any, Protocol
 
+from django.db.models import QuerySet
+from django.views import View
 from rest_framework import permissions
 from rest_framework.request import Request
-
-from django.views import View
-from django.db.models import QuerySet
 
 from users.models import User
 
@@ -17,8 +16,9 @@ class IsSelfOnly(permissions.BasePermission):
     """Разрешение только для владельца объекта"""
 
     def has_object_permission(self, request: Request, view: Any, obj: HasOwner) -> bool:
-        """"Пользователь может читать/редактировать только свой профиль"""
+        """ "Пользователь может читать/редактировать только свой профиль"""
         return obj == request.user
+
 
 class CanViewAllUsers(permissions.BasePermission):
     """Право на просмотр всех пользователей"""
@@ -48,4 +48,3 @@ class CanDeleteUsers(permissions.BasePermission):
         if request.method == "DELETE":
             return request.user.has_perm("users.can_delete_users")
         return True
-
