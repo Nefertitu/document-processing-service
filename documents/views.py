@@ -3,7 +3,7 @@ from typing import Any, Sequence, Union
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Count, Q
 from django.http import FileResponse
 from django.http import HttpResponseForbidden
 from rest_framework import permissions, status, viewsets
@@ -30,8 +30,35 @@ class FolderViewSet(viewsets.ModelViewSet):
     # permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
-        """Возвращает все папки"""
-        return Folder.objects.all()
+        """Получаем базовый queryset папок"""
+
+        queryset = Folder.objects.all()
+
+        if not self.request.user.is_superuser:
+            queryset = queryset.annotate(
+                pending_count=Count("documents",
+                                    filter=Q(documents__status="pending",
+                                             documents__assigned_admin=self.request.user)),
+                approved_count=Count("documents",
+                                     filter=Q(documents__status="approved",
+                                              documents__assigned_admin=self.request.user)),
+                rejected_count=Count("documents",
+                                     filter=Q(documents__status="rejected",
+                                              documents__assigned_admin=self.request.user)),
+                archived_count=Count("documents",
+                                     filter=Q(documents__status="archived",
+                                              documents__assigned_admin=self.request.user)),
+            )
+            queryset = queryset.annotate(
+                pending_count = Count("documents", filter=Q(documents__status="pending",)),
+                approved_count = Count("documents", filter=Q(documents__status="approved",)),
+                rejected_count = Count("documents", filter=Q(documents__status="rejected",)),
+                archived_count = Count("documents", filter=Q(documents__status="archived",)),
+            )
+
+
+        return queryset
+
 
     def get_serializer_class(self):
         return FolderSerializer
@@ -81,36 +108,89 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         """Выбираем сериализатор в зависимости от прав пользователя"""
 
-        if self.request.user.has_perm("documents.view_all_documents"):
+        if self.action == "create":
+            return DocumentSerializer
+        elif self.request.user.has_perm("documents.view_all_documents"):
             return DocumentAdminSerializer
         return DocumentSerializer
-
-    def create(self, request, *args: Any, **kwargs: Any):
-        """Только обычные пользователи могут создавать документы"""
-
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        if request.user.is_staff:
-            return Response({"error": "Администраторы не могут создавать документы"}, status=status.HTTP_403_FORBIDDEN)
-
-        document = DocumentService.create_document(serializer.validated_data, request.user)
-
-        send_single_document_email.delay(
-            document_id=document.pk, status="pending", comment="Получен новый документ на согласование"
-        )
-
-        return Response(
-            {
-                "data": DocumentSerializer(document).data,
-                "success": f"Документ успешно создан {document.title}"
-            },
-            status=status.HTTP_201_CREATED,
-        )
 
     def perform_create(self, serializer):
         """Устанавливаем владельца автоматически"""
         serializer.save(owner=self.request.user)
+
+    def create(self, request, *args: Any, **kwargs: Any):
+        """Только обычные пользователи могут создавать документы"""
+
+        print("FILES в request:", list(request.FILES.keys()))  # Отладка
+        print("DATA в request:", request.data)  # Отладка
+        print("=== ДЕБАГ ИНФОРМАЦИЯ ===")
+        print("Request data:", dict(request.data))
+        print("Request FILES:", dict(request.FILES))
+        print("User:", request.user)
+        print("========================")
+        try:
+            if request.user.is_staff:
+                return Response(
+                    {"error": "Администраторы не могут создавать документы"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            data = request.data.copy()
+            # data['owner'] = request.user.id
+            files = request.FILES.getlist("files")
+            data['files'] = files
+
+            print("FILES в request:", [f.name for f in files])
+            # print("DATA для сериализатора:", data)
+
+            if not files:
+                return Response(
+                    {"error": "Загрузите хотя бы один файл"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            serializer = self.get_serializer(data=request.data)
+            print("Serializer data before validation:", request.data)  # Отладка
+            serializer.is_valid(raise_exception=True)
+            validated_data = serializer.validated_data
+            print("Validated data:", validated_data)
+
+            files_data = request.FILES.getlist('files')
+            print(f"Files_data: {files_data}")
+
+            document = DocumentService.create_document(
+                validated_data,
+                request.user,
+                files_data,
+            )
+            print(f"Создан документ c файлами: {document.title}")
+
+            send_single_document_email.delay(
+                document_id=document.pk,
+                status="pending",
+                comment="Получен новый документ на согласование"
+            )
+
+            detail_serializer = DocumentAdminSerializer(
+                document,
+                context=self.get_serializer_context()
+            )
+            print(f"detail_serializer.data: {detail_serializer.data}")
+            return Response(
+                {
+                    "data": detail_serializer.data,
+                    "success": f"Документ успешно создан {document.title}"
+                },
+                headers=self.get_success_headers(serializer.data),
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            print(f"Ошибка: {str(e)}")
+            return Response(
+                {"error": f"Не удалось создать документ: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     @login_required
     def protected_media(request, path):
@@ -149,30 +229,44 @@ class DocumentViewSet(viewsets.ModelViewSet):
 class ApprovalQueueViewSet(viewsets.ViewSet):
     """ViewSet для работы с очередью администратора"""
 
-    permission_classes = [IsAdminUser(), IsOwnerOnly()]
+    permission_classes = [IsAdminUser]
     serializer_class = ApprovalQueueSerializer
 
-    def get_permissions(self) -> Sequence[Any]:
-        """Управление разрешениями"""
-
-        if self.action == "create":
-            return [permissions.IsAdminuser()]
-        elif self.action == "list":
-            return [permissions.IsAdminuser(), IsOwnerOnly()]
-        elif self.action in ["retrieve", "update", "partial_update", "destroy"]:
-            return [permissions.IsAuthenticated(), IsOwnerOnly()]
-        return [permissions.IsAuthenticated()]
+    # def get_permissions(self) -> Sequence[Any]:
+    #     """Управление разрешениями"""
+    #
+    #     if self.action == "list":
+    #         return [permissions.IsAdminuser()]
+    #     elif self.action in ["create", "retrieve", "update", "partial_update", "destroy"]:
+    #         return [permissions.IsAdminuser()]
+    #     return [permissions.IsAuthenticated()]
 
     def get_queryset(self) -> QuerySet[ApprovalQueue] | None:
         """
         Фильтрует документы в зависимости от прав пользователя.
         Aдмин видит только свои папки
         """
-        user = self.request.user(is_staff=True)
+        user = self.request.user
 
         if user.is_superuser:
             return ApprovalQueue.objects.all()
-        return ApprovalQueue.objects.filter(approver=user)
+        elif user.is_staff:
+            return ApprovalQueue.objects.filter(approver=user)
+        else:
+            return ApprovalQueue.objects.none()
+
+    def get_serializer(self, *args, **kwargs):
+        return ApprovalQueueSerializer(*args, **kwargs)
+
+    def get_serializer_class(self):
+        return ApprovalQueueSerializer
+
+    def list(self, request):
+        """Возвращает список очередей в зависимости от прав"""
+
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class QueueItemViewSet(viewsets.ViewSet):

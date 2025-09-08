@@ -5,11 +5,30 @@ from django.db.models import QuerySet, Count, Q, Case, When, IntegerField
 from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django.utils.html import format_html
 
-from .models import ApprovalQueue, Document, Folder, QueueItem
+from .models import ApprovalQueue, Document, Folder, QueueItem, DocumentFile
 from .services import QueueService, DocumentService, get_next_available_admin
 from .tasks import send_single_document_email
+
+
+class DocumentFileInline(admin.TabularInline):
+    model = DocumentFile
+    extra = 1
+    readonly_fields = ["original_name", "uploaded_at", "file_link", "owner"]
+
+    def file_link(self, obj):
+        if obj.file:
+            return format_html(
+                '<a href="{}" target="_blank">📄 Открыть</a> | '
+                '<a href="{}" download>💾 Скачать</a>',
+                obj.file.url,
+                obj.file.url
+            )
+        return "—"
+
+    file_link.short_description = "Действия"
 
 
 class DocumentInline(admin.TabularInline):
@@ -17,28 +36,56 @@ class DocumentInline(admin.TabularInline):
 
     model = Document
     extra = 0
-    fields = [
-        "id",
-        "title",
-        "status",
-        "reviewed_at",
-        "file",
-        "review_comment",
-        "file_answer",
-        "assigned_admin",
-        "owner",
-    ]
+    # fields = [
+    #     "id",
+    #     "title",
+    #     "status",
+    #     "reviewed_at",
+    #     "file",
+    #     'file_link'
+    #     "review_comment",
+    #     "file_answer",
+    #     "assigned_admin",
+    #     "owner",
+    # ]
+    # inlines = [DocumentFileInline]
     readonly_fields = [
         "id",
         "title",
         "status",
         "reviewed_at",
-        "file",
+        'file_links',
+        "get_files_links",
+        # 'additional_files_list',
         "review_comment",
         "assigned_admin",
         "owner",
     ]
     can_delete = False
+    fieldsets = (
+        (None, {
+            'fields': (
+                "id",
+                "title",
+                "status",
+                "reviewed_at",
+                'file_links',
+                "get_files_links",
+                "review_comment",
+                "file_answer",
+                "assigned_admin",
+                "owner",
+            )
+        }),
+        # ('Дополнительные файлы', {
+        #     'fields': ("get_files_links",),
+        #     'classes': ('collapse',)
+        # }),
+        # ('Системная информация', {
+        #     'fields': ('file_links',),
+        #     'classes': ('collapse',)
+    #     }),
+    )
 
     def get_queryset(self, request):
         """
@@ -51,6 +98,42 @@ class DocumentInline(admin.TabularInline):
             return queryset
 
         return queryset.filter(assigned_admin=request.user)
+
+    def file_links(self, obj):
+        """Ссылка на основной файл"""
+
+        files = DocumentFile.objects.filter(document=obj.pk)
+        file_links = []
+        for file in files:
+            if file:
+                file_links.append(format_html(
+                    '<a href="{}" target="_blank" style="font-weight: bold;">📄 ОТКРЫТЬ ОСНОВНОЙ ФАЙЛ</a> | '
+                    '<a href="{}" download>💾 Скачать</a>',
+                    obj.file.url,
+                    obj.file.url
+                ))
+                return file_links
+
+        return "У файла нет документов"
+
+    file_links.short_description = "Основной файл"
+
+
+    def get_files_links(self, obj):
+        """Отображает все файлы документа (основной + дополнительные)"""
+        links = []
+
+        files = DocumentFile.objects.filter(document=obj.id)
+        for file in files:
+            if file:
+                links.append(
+                    f'<li><strong>Основной:</strong> '
+                    f'<a href="{obj.file.url}" target="_blank">{obj.file.name}</a> '
+                    f'<a href="{obj.file.url}" download>💾</a></li>'
+                )
+
+    get_files_links.short_description = "Все файлы"
+    get_files_links.allow_tags = True
 
     def review_comment(self, obj):
         """Получить комментарий проверяющего"""
@@ -74,7 +157,7 @@ class DocumentInline(admin.TabularInline):
 @admin.register(Folder)
 class FolderAdmin(admin.ModelAdmin):
     """Администрирование папок. Позволяет управлять
-    папками, с возможностью фильтрации и поиска."""
+    папками, с возможностью фильтрации и поиска"""
 
     list_display = (
         "id",
@@ -129,17 +212,19 @@ class FolderAdmin(admin.ModelAdmin):
     def documents_count(self, obj: Folder) -> int:
         """Добавляет количество документов, где текущий пользователь - ответственный админ"""
 
-        if obj.slug == "pending" and hasattr(obj, "pending_count"):
-            return obj.pending_count
-        elif obj.slug == "approved" and hasattr(obj, "approved_count"):
-            return obj.approved_count
-        elif obj.slug == "rejected" and hasattr(obj, "rejected_count"):
-            return obj.rejected_count
-        elif obj.slug == "archived" and hasattr(obj, "archived_count"):
-            return obj.archived_count
+        if obj and obj.slug in ["pending", "approved", "rejected", "archived"]:
+            return Document.objects.filter(status=obj.slug).count()
+        # if obj.slug == "pending" and hasattr(obj, "pending_count"):
+        #     return obj.pending_count
+        # elif obj.slug == "approved" and hasattr(obj, "approved_count"):
+        #     return obj.approved_count
+        # elif obj.slug == "rejected" and hasattr(obj, "rejected_count"):
+        #     return obj.rejected_count
+        # elif obj.slug == "archived" and hasattr(obj, "archived_count"):
+        #     return obj.archived_count
         return 0
 
-    documents_count.short_description = "Количество документов"
+    # documents_count.short_description = "Количество документов"
 
 
 @admin.register(Document)
@@ -155,20 +240,19 @@ class DocumentAdmin(admin.ModelAdmin):
         "status",
         "owner",
         "assigned_admin",
-        "file",
         "owner",
         "uploaded_at",
         "reviewed_at",
         "review_comment",
-        "reviewed_by",
+        "get_reviewed_by",
         "file_answer",
     )
 
     list_filter = (
         "id",
         "status",
-        "folder",
     )
+    inlines = [DocumentFileInline]
     search_fields = (
         "title",
         "owner",
@@ -181,13 +265,44 @@ class DocumentAdmin(admin.ModelAdmin):
         "owner",
         "assigned_admin",
         "folder",
-        "file",
         "description",
         "uploaded_at",
         "review_comment",
         "reviewed_by",
+        "reviewed_at",
         "file_answer",
     ]
+    # fieldsets = (
+    #     (None, {
+    #         'fields': ('title', 'folder', 'status', 'file')
+    #     }),
+    #     ('Дополнительные файлы', {
+    #         'fields': ('additional_files_list',),
+    #         'classes': ('collapse',)
+    #     }),
+    #     ('Системная информация', {
+    #         'fields': ('file_link',),
+    #         'classes': ('collapse',)
+    #     }),
+    # )
+
+    def file_link(self, obj):
+        """Ссылка на основной файл"""
+
+        files = DocumentFile.objects.filter(document=obj.id)
+        if files:
+            links = []
+            for file in files:
+                links.append(format_html(
+                    '<a href="{}" target="_blank" style="font-weight: bold;">📄 ОТКРЫТЬ ОСНОВНОЙ ФАЙЛ</a> | '
+                    '<a href="{}" download>💾 Скачать</a>',
+                    file.url,
+                    file.url
+                ))
+                return links
+        return "У документа нет файлов"
+
+    file_link.short_description = "Файлы документа"
 
     def has_add_permission(self, request, obj=None):
         """Запрет добавлять элементы вручную"""
@@ -199,7 +314,7 @@ class DocumentAdmin(admin.ModelAdmin):
         Только документы из своих папок (очередей).
         """
 
-        queryset = super().get_queryset(request)
+        queryset = super().get_queryset(request).select_related("reviewed_by")
         if request.user.is_superuser:
             return queryset
 
@@ -208,6 +323,15 @@ class DocumentAdmin(admin.ModelAdmin):
     # def has_delete_permission(self, request, obj=None):
     #     """Запрет удаления документов"""
     #     return False
+
+    def get_reviewed_by(self, obj):
+        """Добавляет информацию о проверившем администраторе"""
+        if obj and obj.reviewed_by:
+            return f"{obj.reviewed_by.email} ({obj.reviewed_by.get_full_name()})"
+        return "Не проверено"
+
+    get_reviewed_by.short_description = "Проверивший администратор"
+    get_reviewed_by.admin_order_field = "reviewed_by__email"
 
     def has_change_permission(self, request, obj=None):
         """Разрешение на изменение только своих документов или 'superuser'"""
@@ -276,19 +400,19 @@ class QueueItemInline(admin.TabularInline):
         "get_status",
         "get_title",
         "added_at",
-        "get_file_for_review_link",
+        "get_all_files_links",
         "temp_review_comment",
         "temp_file_answer",
-
         "document_actions",
     )
+    inlines = [DocumentFileInline]
     readonly_fields = [
         "id",
         "position",
         "get_status",
         "get_title",
         "added_at",
-        "get_file_for_review_link",
+        "get_all_files_links",
         "document_actions",
     ]
     can_delete = False
@@ -325,20 +449,56 @@ class QueueItemInline(admin.TabularInline):
 
     get_title.short_description = "Наименование документа"
 
-    def get_file_for_review_link(self, obj):
-        """Отображает ссылку на файл для согласования"""
+    def get_all_files_links(self, obj):
+        """Отображает все файлы документа в очереди"""
+        if not obj.document:
+            return "Документ не найден"
 
-        document = obj.get_document()
-        if document and document.file:
-            return format_html(
-                "<div style='text-align: center;'><a href='{}' target='_blank' style=' color: #0677c8; text-decoration: none;'> {}</a>",
-                document.file.url,
-                document.file.name,
-            )
+        links = []
+        document = obj.document
+        document_files = document.additional_files.all()
 
-        return "Документ не найден"
+        for doc_file in document_files:
+            if doc_file.file:
+                try:
+                    file_name = doc_file.original_name or doc_file.file.name.split('/')[-1]
+                    file_extension = file_name.split('.')[-1].lower() if '.' in file_name else 'file'
 
-    get_file_for_review_link.short_description = "Файл для согласования"
+                    icon_map = {
+                        'pdf': '📄', 'doc': '📝', 'docx': '📝',
+                        'xls': '📊', 'xlsx': '📊', 'jpg': '🖼',
+                        'jpeg': '🖼', 'png': '🖼', 'zip': '📦', 'rar': '📦'
+                    }
+                    icon = icon_map.get(file_extension, '📁')
+
+                    link_html = format_html(
+                        '<div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">'
+                        '<a href="{}" target="_blank" style="background: #417690; color: white; border: none; padding: 3px 8px; text-decoration: none; border-radius: 3px; display: inline-block; cursor: pointer; font-size: 12px;">'
+                        '🔍'
+                        '</a>'
+                        '<a href="{}" download style="background: #205067; color: white; border: none; padding: 3px 8px; text-decoration: none; border-radius: 3px; display: inline-block; cursor: pointer; font-size: 12px;">'
+                        '⬇️'
+                        '</a>'
+                        '<span style="color: #666; font-size: 13px; margin-left: 5px;">{}</span>'
+                        '</div>',
+                        doc_file.file.url,
+                        doc_file.file.url,
+                        file_name
+                    )
+                    links.append(link_html)
+                    print(doc_file.file.url)
+
+                except Exception as e:
+                    print(f"Ошибка при обработке файла {doc_file.id}: {e}")
+                    continue
+
+        if links:
+            combined_html = ''.join(str(link) for link in links)
+            return mark_safe(combined_html)
+        return "Нет файлов"
+
+    get_all_files_links.short_description = "Все файлы документа"
+    get_all_files_links.allow_tags = True
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         """Кастомный вид полей"""
@@ -429,7 +589,8 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
     inlines = [QueueItemInline]
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
-        # Скрываем стандартные кнопки
+        """Скрываем стандартные кнопки в админке"""
+
         extra_context = extra_context or {}
         extra_context["show_save"] = True
         extra_context["show_save_and_continue"] = False
@@ -659,7 +820,7 @@ class QueueItemAdmin(admin.ModelAdmin):
         "queue",
         "document",
         "added_at",
-        "document_file",
+        # "document_file",
         "temp_review_comment",
         "temp_file_answer",
     )
@@ -669,7 +830,7 @@ class QueueItemAdmin(admin.ModelAdmin):
         "document",
         "position",
         "added_at",
-        "document_file",
+        # "document_file",
         "temp_review_comment",
         "temp_file_answer",
     )
@@ -685,29 +846,13 @@ class QueueItemAdmin(admin.ModelAdmin):
             document__isnull=False, document__status="pending", document__assigned_admin=request.user
         )
 
-    def document_file(self, obj):
-        """Показывает файл из документа"""
+    # def document_file(self, obj):
+    #     """Показывает файл из документа"""
+    #
+    #     return obj.document.file if obj.document else None
+    #
+    # document_file.short_description = "Файл на согласование"
 
-        return obj.document.file if obj.document else None
-
-    document_file.short_description = "Файл на согласование"
-
-    # def apply_to_document(self):
-    #     """Переносит временные данные в основной документ"""
-    #
-    #     if self.document:
-    #         if self.temp_review_comment:
-    #             self.document.review_comment = self.temp_review_comment
-    #
-    #         if hasattr(self, "temp_file_answer") and self.temp_file_answer:
-    #             self.document.file_answer = self.temp_file_answer
-    #
-    #         self.document.save()
-    #
-    #         self.temp_review_comment = ""
-    #         if hasattr(self, "temp_file_answer"):
-    #             self.temp_file_answer = None
-    #         self.save()
 
     def has_add_permission(self, request):
         """Запрещаем добавлять элементы вручную"""

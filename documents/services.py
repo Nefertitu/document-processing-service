@@ -13,7 +13,7 @@ from django.db import models, transaction
 from django.db.models import Count
 from django.utils import timezone
 
-from .tasks import archive_old_documents
+from .tasks import archive_old_documents, send_single_document_email
 
 
 User = get_user_model()
@@ -66,17 +66,22 @@ class DocumentHeavyProcessingService :
     def optimize_image(image_file):
         """Сжимает и оптимизирует изображение"""
 
-        img = Image.open(image_file)
-        print(f"Получен файл для оптимизации, размер {img.size}")
-        img = img.resize((1200, 800), Image.Resampling.LANCZOS)
+        print(f"Получен файл: {image_file.name}, размер: {image_file.size}")
+        try:
+            img = Image.open(image_file)
+            print(f"🖼 Изображение открыто: {img.size}, формат: {img.format}")
 
-        output = io.BytesIO()
-        img.save(output, format="JPEG", quality=85, optimize=True)
-        print(f"Оптимизирован файл {img}, размер после оптимизации {img.size}")
-        output.seek(0)
+            img = img.resize((1200, 800), Image.Resampling.LANCZOS)
 
-        return output
+            output = io.BytesIO()
+            img.save(output, format="JPEG", quality=85, optimize=True)
+            print(f"Оптимизирован файл {img}, размер после оптимизации {img.size}")
+            output.seek(0)
 
+            return output
+        except Exception as e:
+            print(f"❌ Ошибка: {e}")
+            raise
 
 def get_next_available_admin(exclude_admin=None):
     """Возвращает следующего доступного администратора"""
@@ -154,26 +159,35 @@ class DocumentService:
     """Сервис для работы с документами"""
 
     @staticmethod
-    def create_document(validated_data, user):
+    def create_document(validated_data, user, files_data):
         """Создание документа с бизнес-логикой"""
 
-        from .models import ApprovalQueue, Document, Folder, QueueItem
+        from .models import ApprovalQueue, Document, Folder, QueueItem, DocumentFile
 
         try:
             pending_folder = Folder.objects.get(slug="pending")
             validated_data["folder"] = pending_folder
+
         except Folder.DoesNotExist:
             print("Папка 'pending' не найдена")
             pass
 
         document = Document.objects.create(**validated_data, owner=user)
 
-        if document.file and document.file.name.lower().endswith((".jpg", ".jpeg", ".png")):
-            print(f"Загружается файл типа {type(document.file)}")
 
-            from .tasks import optimize_image_task
-
-            optimize_image_task.delay(document.pk)
+        for file_data in files_data:
+            DocumentFile.objects.create(
+                document=document,
+                file=file_data,
+                original_name=file_data.name,
+                owner=user
+            )
+            # if file_data and file_data.name.lower().endswith((".jpg", ".jpeg", ".png")):
+            #     print(f"Загружается файл типа {type(document.file_data)}")
+            #
+            #     from .tasks import optimize_image_task
+            #
+            #     optimize_image_task.delay(document.pk)
 
         if not document.assigned_admin:
             document.assign_admin()
@@ -208,7 +222,12 @@ class DocumentService:
                 document.status = "approved"
                 message = f"Документ '{document.title}' одобрен"
                 document.reviewed_at = timezone.localtime()
+                document.reviewed_by = user
                 document.save()
+                send_single_document_email.delay(
+                    document_id=document.pk, status="approved", comment="Документ согласован!"
+                )
+
                 print(f"Статус изменен на: {document.status}")
                 FolderService.move_to_approved(document)
                 archive_old_documents.delay()
@@ -218,7 +237,11 @@ class DocumentService:
                 document.status = "rejected"
                 message = f"Документ '{document.title}' отклонен"
                 document.reviewed_at = timezone.localtime()
+                document.reviewed_by = user
                 document.save()
+                send_single_document_email.delay(
+                    document_id=document.pk, status="rejected", comment="Документ отклонен!"
+                )
                 print(f"Статус изменен на: {document.status}")
                 FolderService.move_to_rejected(document)
                 archive_old_documents.delay()
@@ -330,6 +353,54 @@ class QueueService:
         except Exception as e:
             print(f"Ошибка добавления документа в очередь: {e}")
             return False
+
+    @staticmethod
+    def find_suitable_queue_for_document(document):
+        """Найти или создать подходящую очередь для документа"""
+
+        from .models import ApprovalQueue
+
+        print(f"Попытка определить для документа {document.title} подходящую очередь")
+
+        if not document.assigned_admin:
+            print(f"Администратор: None - документ не будет добавлен в очередь")
+            return None
+
+        print(f"Администратор: {document.assigned_admin.email}")
+
+        try:
+            active_queues = ApprovalQueue.objects.filter(
+                approver=document.assigned_admin,
+                is_stop=False
+            ).annotate(
+                items_count=Count("items")
+            )
+
+            if not active_queues.exists():
+                # Создаем новую очередь если нет активных
+                queue = ApprovalQueue.objects.create(
+                    approver=document.assigned_admin,
+                    is_stop=False
+                )
+                print(f"Создан новая очередь: {queue.id}")
+
+            elif active_queues.count() == 1:
+                queue = active_queues.first()
+
+            else:
+                queue = active_queues.order_by("items_count").first()
+
+            print(f"Выбрана очередь {queue.id} с {queue.items_count} документами")
+            print(f"Документов в очереди после включения в очередь: {active_queue.items.count()}")
+
+            return queue
+
+        except Exception as e:
+            print(f"Ошибка добавления документа в очередь: {e}")
+            return None
+
+
+
 
     @staticmethod
     def get_or_create_queue(admin):

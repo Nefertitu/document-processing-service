@@ -60,6 +60,7 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
             print(
                 f"Подтвержден документ: {document.title}, уведомление отправлено на почту пользователю {document.owner.email}"
             )
+            print(f"Результат отправки: {result}")
 
         elif status == "rejected":
             subject = "❌ Ваш документ отклонен"
@@ -143,6 +144,7 @@ def optimize_image_task(document_id):
             return
 
         optimized_image = DocumentHeavyProcessingService.optimize_image(document.file)
+        print(f"✅ Успешно! Размер: {len(optimized_image.getvalue())} bytes")
         document.temp_file.save("optimized.jpg", optimized_image)
         original_file = document.file
         document.temp_file = None

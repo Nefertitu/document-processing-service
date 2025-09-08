@@ -9,7 +9,7 @@ app_name = DocumentsConfig.name
 
 router = DefaultRouter()
 router.register(r"folders", FolderViewSet, basename="folder")
-router.register(r"queues", ApprovalQueueViewSet, basename="approvalqueue")
+router.register(r"approval-queue", ApprovalQueueViewSet, basename="approvalqueue")
 router.register(r"queue_items", QueueItemViewSet, basename="queueitem")
 router.register(r"", DocumentViewSet, basename="document")
 

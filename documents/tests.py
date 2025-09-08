@@ -48,41 +48,21 @@ class DocumentTestCase(APITestCase):
     def test_document_retrieve(self) -> None:
         """Тест получения деталей документа"""
 
-        print(f"Document ID: {self.document.pk}")
-        print(f"Document exists: {Document.objects.filter(pk=self.document.pk).exists()}")
-
-        # ПРОВЕРЬТЕ что пользователь имеет права
-        print(f"User: {self.user.email}")
-        print(f"Is owner: {self.document.owner == self.user}")
-        print(
-            f"Is assigned admin: {self.document.assigned_admin == self.user if self.document.assigned_admin else False}")
         url = reverse("documents:document-detail", kwargs={"pk": self.document.pk})
-        # superuser = User.objects.create(email="superuser@example.com", first_name="Superuser", password="123eee")
         self.client.force_authenticate(user=self.admin)
         response = self.client.get(url)
-        # data = response.json()
-        print(f"Response status: {response.status_code}")
-        if response.status_code == 200:
-            data = response.json()
-            print(f"Response data: {data}")
-
-            self.assertTrue(
-                response.status_code == 200 or
-                (self.client.force_authenticate(user=self.user) and
-                 self.client.get(url).status_code == 200)
-            )
-
-            self.assertEqual(data.get("title"), self.document.title)
-            self.assertEqual(data.get("owner"), self.document.owner.email)
-            self.assertEqual(data.get("assigned_admin")["email"], self.admin.email)
-            self.assertEqual(data.get("title"), self.document.title)
-            self.assertEqual(data.get("status"), "pending")
-            self.assertEqual(data.get("folder"), "pending")
-            self.assertEqual(True, self.document.file)
-        else:
-            print(f"Error: {response.data}")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.data
+
+        self.assertEqual(data.get("title"), self.document.title)
+        self.assertEqual(data.get("owner"), self.document.owner.email)
+        self.assertEqual(data.get("assigned_admin")["email"], self.admin.email)
+        self.assertEqual(data.get("title"), self.document.title)
+        self.assertEqual(data.get("status"), "pending")
+        self.assertIsNotNone(data.get("file"))
+        self.assertEqual(data.get("folder"), "pending")
 
     def test_document_create(self):
         """Тест создания документа с файлом"""

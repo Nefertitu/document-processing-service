@@ -99,16 +99,10 @@ class Document(models.Model):
         blank=False,
         null=False,
         verbose_name="Владелец",
-        help_text="Укажите владельца документа",
         related_name="documents",
     )
     folder = models.ForeignKey(
         "Folder", on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Папка", related_name="documents"
-    )
-    file = models.FileField(
-        verbose_name="Расположение vs название файла",
-        upload_to=DocumentFilePathGeneratorService.user_document_path,
-        help_text="Введите название файла",
     )
     status = models.CharField(
         max_length=10,
@@ -138,17 +132,11 @@ class Document(models.Model):
         related_name="reviewed_documents"
     )
     file_answer = models.FileField(
-        upload_to=DocumentFilePathGeneratorService.admin_document_path,
+        upload_to="DocumentFilePathGeneratorService.admin_document_path",
         blank=True,
         null=True,
         verbose_name="Ответный файл администратора",
         help_text="Файл для отправки пользователю в качестве ответа",
-    )
-    temp_file = models.FileField(
-        upload_to=DocumentFilePathGeneratorService.temp_upload_path,
-        blank=True,
-        null=True,
-        verbose_name="Временный файл",
     )
 
     class Meta:
@@ -200,6 +188,54 @@ class Document(models.Model):
         return self.assigned_admin
 
 
+class DocumentFile(models.Model):
+    document = models.ForeignKey(
+        "Document",
+        on_delete=models.CASCADE,
+        related_name="additional_files",
+    )
+    file = models.FileField(
+        verbose_name="Расположение vs название файла",
+        upload_to="DocumentFilePathGeneratorService.user_document_path",
+        help_text="Введите название файла",
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        blank=False,
+        null=False,
+        verbose_name="Владелец файла",
+        related_name="owner_files",
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    original_name = models.CharField(max_length=255)
+
+    def save(self, *args, **kwargs):
+        """Определяет способ записи наименования файла"""
+
+        if not self.original_name:
+            self.original_name = self.file.name[:20]
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Файл"
+        verbose_name_plural = "Файлы"
+        ordering = ["-uploaded_at"]
+
+    def __str__(self) -> str:
+        """Строковое отображение модели Файл"""
+        return f"{self.file.name}"
+
+
+class ApprovalQueueManager(models.Manager):
+    """Класс менеджер модели 'ApprovalQueue'"""
+
+    def reorganize(self, queue_id):
+        """Импорт сервисного метода реорганизации очереди"""
+        from .services import QueueService
+        return QueueService.reorganize_queue(queue_id)
+
+
 class ApprovalQueue(models.Model):
     """Модель Очередь"""
 
@@ -224,6 +260,8 @@ class ApprovalQueue(models.Model):
         verbose_name="Остановка очереди",
     )
 
+    objects = ApprovalQueueManager()
+
     class Meta:
         verbose_name = "Очередь"
         verbose_name_plural = "Очереди"
@@ -245,23 +283,41 @@ class ApprovalQueue(models.Model):
 
     def reorganize(self):
         """Пересчитывает позиции элементов в очереди"""
+        return self.__class__.objects.reorganize(self.pk)
 
+
+class QueueItemManager(models.Manager):
+    def create_with_position(self, **kwargs):
+        """Создает элемент очереди с автоматическим определением позиции"""
         from .services import QueueService
 
-        return QueueService.reorganize_queue(self.pk)
+        queue = QueueService.find_suitable_queue_for_document(document)
+        if not queue:
+            raise ValueError("Не удалось найти подходящую очередь")
+
+        position = queue.get_next_position()
+
+        print(f"✅ Документ {document.id} добавлен в очередь: {item.id}")
+
+        return self.create(
+            queue=queue,
+            document=document,
+            position=position,
+            **kwargs
+        )
 
 
 class QueueItem(models.Model):
     """Модель Элемент очереди с позицией"""
 
     queue = models.ForeignKey(
-        ApprovalQueue,
+        "ApprovalQueue",
         on_delete=models.CASCADE,
         verbose_name="Очередь",
         related_name="items",  # В ApprovalQueue: approval_queue.items.all()
     )
     document = models.ForeignKey(
-        Document,
+        "Document",
         on_delete=models.CASCADE,
         verbose_name="Документ",
         related_name="queue_items",  # document.queue_items.all()
@@ -287,6 +343,8 @@ class QueueItem(models.Model):
         null=True,
     )
 
+    objects = QueueItemManager()
+
     def __str__(self) -> str:
         return f"ID: {self.pk} {self.document.title}, (позиция в очереди: {self.position})"
 
@@ -308,29 +366,28 @@ class QueueItem(models.Model):
             return None
 
     def save(self, *args, **kwargs):
-        """Автоматическое определение позиции при создании"""
-
-        print(f"QueueItem.save() called: adding={self._state.adding}, position={self.position}")
+        """Сохранение элемента очереди"""
 
         super().save(*args, **kwargs)
 
-        if self._state.adding and self.position == 0:
-            new_position = self.queue.get_next_position()
-            print(f"Setting position from {self.position} to {new_position}")
-            self.position = new_position
-            print(f"QueueItem saved with ID: {self.id}, position: {self.position}")
+        # if self._state.adding and self.position == 0:
+        #     new_position = self.queue.get_next_position()
+        #     print(f"Следующая позиция: {new_position}")
+        #
+        #     print(f"Setting position from {self.position} to {new_position}")
+        #     self.position = new_position
+        #     super().save(update_fields=["position"])
+        #     print(f"QueueItem saved with ID: {self.id}, position: {self.position}")
 
-            QueueService.add_to_approval_queue(self)
+            # if not QueueItem.objects.filter(queue=queue, document=document).exists():
+            #     item = QueueItem.objects.create(
+            #         queue=queue,
+            #         document=document,
+            #         position=ApprovalQueue.get_next_position(queue)
+            #     )
+            #     print(f"✅ Документ {document.id} добавлен в очередь: {item.id}")
+            #     return True
 
-    # def apply_to_document(self):
-    #     """Переносит данные из временных полей в основной документ"""
-    #
-    #     if self.document:
-    #         if self.temp_review_comment:
-    #             self.document.review_comment = self.temp_review_comment
-    #         if self.temp_file_answer:
-    #             self.document.file_answer = self.temp_file_answer
-    #         self.document.save()
 
     def delete(self, *args, **kwargs):
         """Переопределяем удаление для автоматической реорганизации очереди"""
