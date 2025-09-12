@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.utils import timezone
+from django.db.models import Q
 from PIL import Image
 
 from config import settings
@@ -87,75 +88,59 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
 
 
 @shared_task
-def send_bulk_documents_email(document_ids: list[int], status: str, general_comment: str = "") -> None:
-    """Массовая отправка уведомлений - создает отдельные задачи для каждого документа"""
-
-    for document_id in document_ids:
-        # Для каждого документа создаем отдельную задачу
-        send_single_document_email.delay(
-            document_id=document_id, status=status, comment=general_comment  # Общий комментарий для всех
-        )
-
-    print(f"Создано {len(document_ids)} задач для отправки уведомлений")
-
-
-@shared_task
-def cleanup_temp_files():
-    """Удаляет временные файлы старше 24 часов"""
-
-    from .models import Document
-
-    old_documents = Document.objects.filter(
-        temp_file__isnull=False, uploaded_at__lt=timezone.now() - timedelta(hours=24)
-    )
-
-    for doc in old_documents:
-        doc.temp_file.delete()  # Удаляет файл из storage
-        doc.temp_file = None
-        doc.save()
-
-
-# @shared_task
-# def process_document_task(document_id):
-#     """Фоновая обработка документа"""
-#
-#     from .models import Document
-#
-#     document = Document.objects.get(id=document_id)
-#     try:
-#         processed_file = some_heavy_processing(document.file)
-#         document.temp_file.save('processed.pdf', processed_file)
-#         document.save()
-#     except Exception as e:
-#         logger.error(f"Ошибка обработки: {e}")
-
-
-@shared_task
-def optimize_image_task(document_id):
+def optimize_image_task(document_file_id):
     """Фоновая оптимизация файлов"""
 
-    from .models import Document
-    from .services import DocumentHeavyProcessingService
+    print(f"🎯 START: Задача оптимизации для файла ID: {document_file_id}")
 
     try:
-        document = Document.objects.get(id=document_id)
+        from .models import Document, DocumentFile
+        from .services import DocumentHeavyProcessingService
+        import os
 
-        if not document.file:
+        print(f"🔍 Поиск файла с ID: {document_file_id}")
+        document_file = DocumentFile.objects.get(id=document_file_id)
+        print(f"✅ Файл найден: {document_file.id}")
+        print(f"🔄 Начинаем оптимизацию файла ID: {document_file_id}")
+        print(
+            f"📊 Статистика: документ {document_file.document.id} "
+            f"имеет {document_file.document.additional_files.count()} файлов")
+
+        if not document_file.file:
+            print(f"❌ У файла нет содержимого")
             return
+        print("Найдены файлы оптимизации")
 
-        optimized_image = DocumentHeavyProcessingService.optimize_image(document.file)
-        print(f"✅ Успешно! Размер: {len(optimized_image.getvalue())} bytes")
-        document.temp_file.save("optimized.jpg", optimized_image)
-        original_file = document.file
-        document.temp_file = None
-        document.save()
+        print(f"📁 Обрабатываем: {document_file.file.name}")
+        original_filename = os.path.basename(document_file.file.name)
+        print(f"🔄 Оптимизация файла: {original_filename} (ID: {document_file_id})")
 
-        original_file.delete()
+        print(f"⚙️ Вызов DocumentHeavyProcessingService.optimize_image")
+        optimized_image = DocumentHeavyProcessingService.optimize_image(document_file.file)
+
+        if optimized_image:
+            print(f"💾 Сохранение оптимизированного файла")
+            document_file.file.save(
+                original_filename,
+                optimized_image,
+                save=True
+            )
+            # print(f"✅ Успешно оптимизирован файл ! Размер: {len(optimized_image.getvalue())} bytes")
+            print(f"✅ Файл {original_filename} оптимизирован и сохранен")
+            return "success"
+        else:
+            print(f"⚠️ Не удалось оптимизировать файл {original_filename}")
+            return "skipped"
 
     except Document.DoesNotExist:
-        print(f"Документ {document_id} не найден")
+        print(f"❌ Файл документа {document_id} не найден")
     except Exception as e:
-        print(f"Ошибка обработки: {e}")
+        print(f"❌ Ошибка обработки: {e}")
+
+        import traceback
+
+        traceback.print_exc()
+        return "error"
 
 
 @shared_task
@@ -164,24 +149,47 @@ def archive_old_documents():
 
     from .models import Document
     from .services import FolderService
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.db.models import Q
 
     try:
         archive_date = timezone.localtime() - timedelta(minutes=5)
+        print(f"Дата архивации по времени 'since reviewed_at': {archive_date}")
+
+        archive_date_created = timezone.localtime() - timedelta(hours=1)
+        print(f"Дата архивации по времени 'since created_at': {archive_date_created}")
+
         old_documents = Document.objects.filter(
-            reviewed_at__lte=archive_date, folder__slug__in=["approved", "rejected"]
-        )
+            Q(reviewed_at__lte=archive_date, status__in=["approved", "rejected"]) |
+            Q(uploaded_at__lte=archive_date_created, status__in=["approved", "rejected"])
+            ).exclude(status="archived")
+
         print(f"Найдено документов для архивации: {old_documents.count()}")
 
         archived_count = 0
         for document in old_documents:
-            print(f"Переносим в архив документ {document.id}: {document.title}")
-            if FolderService.move_to_archive(document):
-                archived_count += 1
-                print(f"Документ {document.id} перенесен в папку 'архив'")
+            try:
+                print(f"Переносим в архив документ {document.id}: {document.title}")
+
+
+
+                if FolderService.move_to_archive(document):
+                    print(f"Статус документа после переноса: {document.status}")
+
+                    archived_count += 1
+
+                    print(f"✓ Документ {document.id} перенесен в папку 'архив'")
+                else:
+                    print(f"✗ Ошибка перемещения документа {document.id}")
+
+            except Exception as e:
+                print(f"✗ Ошибка архивации документа {document.id}: {e}")
+                continue
 
         print(f"Всего архивировано: {archived_count}")
         return archived_count
 
     except Exception as e:
-        print(f"Ошибка переноса документов в архив: {e}")
+        print(f"✗ Ошибка переноса документов в архив: {e}")
         return 0

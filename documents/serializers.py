@@ -65,13 +65,10 @@ class FolderSerializer(serializers.ModelSerializer):
             "slug",
             "created_at",
         )
-        validators = [TitleValidator(field="title")]
+        validators = [TitleValidator(field="title"), DocumentFileValidator(field="file")]
 
     def get_documents_in_folder(self, obj: Folder) -> int:
         """Возвращает аннотированное количество документов для папки"""
-
-        # if obj and obj.slug in ["pending", "approved", "rejected", "archived"]:
-        #     return Document.objects.filter(status=obj.slug).count()
 
         if obj.slug == "pending" and hasattr(obj, "pending_count"):
             return obj.pending_count
@@ -88,12 +85,50 @@ class FolderSerializer(serializers.ModelSerializer):
 class BaseDocumentSerializer(serializers.ModelSerializer):
     """Базовый сериализатор с общей логикой"""
 
+    owner_info = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+
+
+    def get_owner_info(self, obj):
+        """Возвращает данные о создателе документа"""
+
+        if obj.owner:
+            return {
+                "email": obj.owner.email,
+                "full_name": obj.owner.get_full_name(),
+            }
+
     def get_serializer_context(self):
         """Добавляем request в контекст сериализатора"""
 
         context = super().get_serializer_context()
         context["request"] = self.request
         return context
+
+    def get_file_url(self, obj):
+        """Возвращает абсолютный путь до файла"""
+
+        try:
+            document_file = obj.additional_files.first()
+
+            if document_file and document_file.file:
+                print(f"file: {document_file}")
+                request = self.context.get("request")
+                url = document_file.file.url
+
+                if request:
+                    return request.build_absolute_uri(url)
+                else:
+                    if settings.DEBUG:
+
+                        return f"http://localhost:8000{url}"
+                    else:
+                        return f"https://{os.getenv("SERVER_IP")}{url}"  # ???
+
+        except Exception as e:
+            print(f"Ошибка получения URL файла: {e}")
+
+        return None
 
 
 class DocumentSerializer(BaseDocumentSerializer):
@@ -109,6 +144,8 @@ class DocumentSerializer(BaseDocumentSerializer):
         error_messages={
             "required": "Поле обязательно для заполнения!",
             "blank": "Поле не может быть пустым!",
+            # "invalid": "Неверный ввод!",
+            # "null": "Поле не может быть null!"
         },
     )
     description = serializers.CharField(
@@ -120,50 +157,48 @@ class DocumentSerializer(BaseDocumentSerializer):
         validators=[TitleValidator(field="description")],
         required=False,
         allow_blank=True,
+        read_only=True
     )
-    # assigned_admin = serializers.SerializerMethodField()
-    # reviewed_by_admin = serializers.SerializerMethodField()
-    # owner = serializers.SerializerMethodField()
-    # files = serializers.ListField(
-    #     child=serializers.FileField(
-    #         max_length=100000,
-    #         allow_empty_file=False,
-    #         use_url=False
-    #     ),
-    #     write_only=True,
-    #     required=True,
-    #     error_messages={
-    #         "required": "Загрузите хотя бы один файл!",
-    #     }
-    # )
+    assigned_admin_info = serializers.SerializerMethodField()
+    reviewed_by_info = serializers.SerializerMethodField()
     folder = serializers.SlugRelatedField(
         slug_field="slug",
         read_only=True
     )
 
-    # def get_owner(self, instance: Document) -> Optional[str]:
-    #     """Возвращает email пользователя-создателя привычки"""
-    #     return str(instance.owner.email) if instance.owner else None
+    def get_assigned_admin_info(self, obj):
+        """Добавляет информацию об ответственном администраторе"""
 
-    # def get_assigned_admin(self, obj):
-    #     """Добавляет информацию об ответственном администраторе"""
-    #
-    #     if obj.assigned_admin:
-    #         return {"email": obj.assigned_admin.email, "full_name": obj.assigned_admin.get_full_name()}
-    #     return None
+        if obj.assigned_admin:
+            return {
+                "email": obj.assigned_admin.email,
+                "full_name": obj.assigned_admin.get_full_name()
+            }
+        return None
 
-    # def get_reviewed_by_admin(self, obj):
-    #     """Добавляет информацию о проверившем администраторе"""
-    #
-    #     if obj.reviewed_by:
-    #         return {"email": obj.reviewed_by.email, "full_name": obj.reviewed_by.get_full_name()}
-    #     return None
+    def get_reviewed_by_info(self, obj):
+        """Добавляет информацию о проверившем администраторе"""
+
+        if obj.reviewed_by:
+            return {
+                "email": obj.reviewed_by.email,
+                "full_name": obj.reviewed_by.get_full_name()
+                }
+        return None
 
     class Meta:
         model = Document
-        fields = ["id", "title", "assigned_admin", "description", "status", "uploaded_at", "owner", "reviewed_by", "review_comment", "folder"]
-        read_only_fields = ["status", "uploaded_at", "owner"]
-        # validators = [DocumentFileValidator(), TitleValidator(field="title")]
+        fields = ["id", "title", "description", "status", "owner_info", "assigned_admin_info", "uploaded_at", "file_url", "reviewed_by_info", "review_comment", "reviewed_at", "folder"]
+        read_only_fields = ["status", "uploaded_at", "owner_info", "assigned_admin_info", "reviewed_by_info", "folder"]
+        validators = [TitleValidator(field="title")]
+
+    def update(self, instance, validated_data):
+        """Если есть комментарий или файл ответа, устанавливаем reviewed_by"""
+
+        if "review_comment" in validated_data or "file_answer" in validated_data:
+            validated_data["reviewed_by"] = self.context["request"].user
+
+        return super().update(instance, validated_data)
 
 
 class DocumentAdminSerializer(BaseDocumentSerializer):
@@ -173,20 +208,13 @@ class DocumentAdminSerializer(BaseDocumentSerializer):
     Видят: полную информацию о владельце.
     """
 
-    assigned_admin = serializers.SerializerMethodField(source="assigned_admin.email", read_only=True)
-    owner_email = serializers.EmailField(source="owner.email", read_only=True)
-    owner_name = serializers.CharField(source="owner.get_full_name", read_only=True)
+    assigned_admin_info = serializers.SerializerMethodField()
     review_comment = serializers.CharField(
         validators=[TitleValidator(field="description")],
     )
     file_url = serializers.SerializerMethodField()
 
-    class Meta:
-        model = Document
-        fields = ["id", "title", "description", "assigned_admin", "owner_email", "owner_name", "files", "uploaded_at", "reviewed_at", "review_comment"]
-        read_only_fields = ["title", "description", "assigned_admin", "owner_email", "owner_name", "uploaded_at", "reviewed_at", "review_comment"]
-
-    def get_assigned_admin(self, obj):
+    def get_assigned_admin_info(self, obj):
         """Добавляет информацию об администраторе"""
 
         if obj.assigned_admin:
@@ -197,30 +225,18 @@ class DocumentAdminSerializer(BaseDocumentSerializer):
             }
         return None
 
-
-    def get_file_url(self, obj):
-        """Возвращает абсолютный путь до файла"""
-
-        file = DocumentFile.objects.get(document=obj.id)
-        if file:
-            print(f"file: {file}")
-            request = self.context.get("request")
-            if request:
-                return request.build_absolute_uri(file.url)
-            else:
-                if settings.DEBUG:
-
-                    return f"http://localhost:8000{obj.file.url}"
-                else:
-                    return f"https://{os.getenv("SERVER_IP")}{obj.file.url}"  # ???
-        return None
-
+    class Meta:
+        model = Document
+        fields = ["id", "title", "description", "assigned_admin_info", "owner_info", "file_url",
+                  "uploaded_at", "reviewed_at", "review_comment"]
+        read_only_fields = ["title", "description", "assigned_admin_info", "owner_info", "uploaded_at",
+                            "reviewed_at", "review_comment"]
 
 
 class ApprovalQueueSerializer(serializers.ModelSerializer):
     """Сериализатор для модели 'ApprovalQueue'"""
 
-    documents_in_queue = serializers.SerializerMethodField()
+    count_documents_in_queue = serializers.SerializerMethodField()
     title = serializers.CharField(
         required=True,
         error_messages={
@@ -228,14 +244,16 @@ class ApprovalQueueSerializer(serializers.ModelSerializer):
             "blank": "Поле не может быть пустым!",
         },
     )
+    documents_in_queue = serializers.SerializerMethodField()
+    approver_info = serializers.SerializerMethodField()
 
     class Meta:
         model = ApprovalQueue
-        fields = ["id", "title", "approver", "created_at", "documents_in_queue"]
+        fields = ["id", "title", "approver_info", "created_at", "documents_in_queue", "count_documents_in_queue"]
         validators = [TitleValidator(field="title")]
 
-    def get_documents_in_queue(self, obj):
-        """Возвращает список документов в очереди"""
+    def get_count_documents_in_queue(self, obj):
+        """Возвращает количество документов в очереди"""
 
         request = self.context.get("request")
 
@@ -243,9 +261,55 @@ class ApprovalQueueSerializer(serializers.ModelSerializer):
             return 0
 
         if request.user.is_superuser:
-            approval_queue = ApprovalQueue.objects.filter(queue=queue)
-            return
-        return ApprovalQueue.objects.filter(queue=queue, approver=request.user)
+            return obj.items.count()
+
+        if request.user.is_staff:
+            if obj.approver == request.user:
+                return obj.items.count()
+            return 0
+
+        return obj.items.filter(document__owner=request.user).count()
+
+    def get_documents_in_queue(self, obj):
+        """Возвращает список документов в очереди"""
+
+        request = self.context.get("request")
+
+        documents_in_queue = Document.objects.filter(
+            queue_items__queue_id=obj.pk
+        )
+        for doc in documents_in_queue:
+            # file_url = [file.file.url for file in DocumentFile.objects.filter(document=doc.pk)]
+            # file_name = [file.file.original_name for file in DocumentFile.objects.filter(document=doc.pk)]
+
+            data = {
+                "id": doc.pk,
+                "title": doc.title,
+                "status": doc.status,
+                "uploaded_at": doc.uploaded_at,
+                "owner_info": {
+                    "owner_email": doc.owner.email,
+                    "owner_name": doc.owner.full_name,
+                },
+                "assigned_admin_info":{
+                    "assigned_admin_email": doc.assigned_admin.email,
+                    "assigned_admin_name": doc.assigned_admin.full_name,
+                },
+                "files": [file.file.url for file in DocumentFile.objects.filter(document=doc.pk)],
+                # {
+                    # "file_name": file_name,
+                    # "file_url": file_url,
+                    # },
+            }
+            return data
+
+    def get_approver_info(self, obj):
+        """Возвращает данные об ответственном администраторе"""
+
+        return {
+            "approver_email": obj.approver.email,
+            "approver_name": obj.approver.full_name,
+        }
 
 
 class QueueItemSerializer(serializers.ModelSerializer):
@@ -253,4 +317,23 @@ class QueueItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = QueueItem
-        fields = ["position", "queue", "added_at", "document"]
+        fields = ["position", "queue", "added_at", "document", "temp_review_comment", "temp_file_answer"]
+
+
+class DocumentFileSerializer(serializers.ModelSerializer):
+    """Сериализатор для модели 'DocumentFile'"""
+
+    class Meta:
+        model = DocumentFile
+        fields = ["id", "document", "file", "owner", "uploaded_at", "original_name"]
+        read_only_fields = ["owner", "uploaded_at", "original_name"]
+        validators = [DocumentFileValidator()]
+
+    def create(self, validated_data):
+        """Автоматически устанавливается 'owner' и 'original_name'"""
+
+        request = self.context.get("request")
+        validated_data["owner"] = request.user
+        validated_data["original_name"] = validated_data["file"].name
+
+        return super().create(validated_data)

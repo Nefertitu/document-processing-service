@@ -47,7 +47,8 @@ class User(AbstractUser):
 
     @property
     def full_name(self):
-        """Возвращает полное имя"""
+        """Возвращает полное имя пользователя"""
+
         if self.last_name:
             return f"{self.first_name} {self.last_name}"
         return f"{self.first_name}"

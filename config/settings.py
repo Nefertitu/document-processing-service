@@ -53,6 +53,8 @@ if DEBUG:
             "rest_framework.permissions.AllowAny",
         ],
         # "DEFAULT_PERMISSION_CLASSES": [],
+        "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
+        "USE_TZ": True,
     }
 
 
@@ -192,15 +194,16 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
 }
 
-CELERY_TASK_ANNOTATIONS = {"habits.tasks.send_reminder": {"default_retry_delay": 300, "max_retries": 2}}
 
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
-# CELERY_BEAT_SCHEDULE = {
-#     "block_inactive_users": {
-#         "task": "users.tasks.check_last_login_and_block",
-#         "schedule": timedelta(days=1),  # timedelta(minutes=5)
-#     },
-# }
+
+CELERY_BEAT_SCHEDULE = {
+    "archive_old_documents_daily": {
+        "task": "documents.tasks.archive_old_documents",
+        # "schedule": timedelta(days=1),  # Каждый день
+        "schedule": timedelta(minutes=5),  # Для тестирования - каждые 5 минут
+    },
+}
 
 CELERY_TASK_QUEUES = {
     "celery": {

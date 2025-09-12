@@ -11,6 +11,7 @@ from django.utils.html import format_html
 from .models import ApprovalQueue, Document, Folder, QueueItem, DocumentFile
 from .services import QueueService, DocumentService, get_next_available_admin
 from .tasks import send_single_document_email
+from documents.utils.file_display import get_files_display_html, get_file_answer_display
 
 
 class DocumentFileInline(admin.TabularInline):
@@ -18,73 +19,33 @@ class DocumentFileInline(admin.TabularInline):
     extra = 1
     readonly_fields = ["original_name", "uploaded_at", "file_link", "owner"]
 
-    def file_link(self, obj):
-        if obj.file:
-            return format_html(
-                '<a href="{}" target="_blank">📄 Открыть</a> | '
-                '<a href="{}" download>💾 Скачать</a>',
-                obj.file.url,
-                obj.file.url
-            )
-        return "—"
-
-    file_link.short_description = "Действия"
-
 
 class DocumentInline(admin.TabularInline):
     """Inline для отображения документов внутри папок"""
 
     model = Document
     extra = 0
-    # fields = [
-    #     "id",
-    #     "title",
-    #     "status",
-    #     "reviewed_at",
-    #     "file",
-    #     'file_link'
-    #     "review_comment",
-    #     "file_answer",
-    #     "assigned_admin",
-    #     "owner",
-    # ]
-    # inlines = [DocumentFileInline]
+    # show_change_link = True
+
     readonly_fields = [
         "id",
-        "title",
+        "title_link",
         "status",
-        "reviewed_at",
-        'file_links',
-        "get_files_links",
-        # 'additional_files_list',
-        "review_comment",
         "assigned_admin",
-        "owner",
+        "reviewed_at",
     ]
     can_delete = False
     fieldsets = (
         (None, {
             'fields': (
                 "id",
-                "title",
+                # "title",
+                "title_link",
                 "status",
-                "reviewed_at",
-                'file_links',
-                "get_files_links",
-                "review_comment",
-                "file_answer",
                 "assigned_admin",
-                "owner",
+                "reviewed_at",
             )
         }),
-        # ('Дополнительные файлы', {
-        #     'fields': ("get_files_links",),
-        #     'classes': ('collapse',)
-        # }),
-        # ('Системная информация', {
-        #     'fields': ('file_links',),
-        #     'classes': ('collapse',)
-    #     }),
     )
 
     def get_queryset(self, request):
@@ -99,41 +60,20 @@ class DocumentInline(admin.TabularInline):
 
         return queryset.filter(assigned_admin=request.user)
 
-    def file_links(self, obj):
-        """Ссылка на основной файл"""
+    def title_link(self, obj):
+        """Создает кликабельную ссылку на документ"""
 
-        files = DocumentFile.objects.filter(document=obj.pk)
-        file_links = []
-        for file in files:
-            if file:
-                file_links.append(format_html(
-                    '<a href="{}" target="_blank" style="font-weight: bold;">📄 ОТКРЫТЬ ОСНОВНОЙ ФАЙЛ</a> | '
-                    '<a href="{}" download>💾 Скачать</a>',
-                    obj.file.url,
-                    obj.file.url
-                ))
-                return file_links
+        if obj and obj.id:
+            url = reverse('admin:documents_document_change', args=[obj.id])
+            return format_html(
+                '<a href="{}" style="font-weight: bold;">{}</a>',
+                url,
+                obj.title
+            )
+        return obj.title if obj else ""
 
-        return "У файла нет документов"
-
-    file_links.short_description = "Основной файл"
-
-
-    def get_files_links(self, obj):
-        """Отображает все файлы документа (основной + дополнительные)"""
-        links = []
-
-        files = DocumentFile.objects.filter(document=obj.id)
-        for file in files:
-            if file:
-                links.append(
-                    f'<li><strong>Основной:</strong> '
-                    f'<a href="{obj.file.url}" target="_blank">{obj.file.name}</a> '
-                    f'<a href="{obj.file.url}" download>💾</a></li>'
-                )
-
-    get_files_links.short_description = "Все файлы"
-    get_files_links.allow_tags = True
+    title_link.short_description = "Наименование документа"
+    title_link.allow_tags = True
 
     def review_comment(self, obj):
         """Получить комментарий проверяющего"""
@@ -167,7 +107,6 @@ class FolderAdmin(admin.ModelAdmin):
     )
 
     list_filter = (
-        "id",
         "title",
     )
     search_fields = (
@@ -213,18 +152,11 @@ class FolderAdmin(admin.ModelAdmin):
         """Добавляет количество документов, где текущий пользователь - ответственный админ"""
 
         if obj and obj.slug in ["pending", "approved", "rejected", "archived"]:
-            return Document.objects.filter(status=obj.slug).count()
-        # if obj.slug == "pending" and hasattr(obj, "pending_count"):
-        #     return obj.pending_count
-        # elif obj.slug == "approved" and hasattr(obj, "approved_count"):
-        #     return obj.approved_count
-        # elif obj.slug == "rejected" and hasattr(obj, "rejected_count"):
-        #     return obj.rejected_count
-        # elif obj.slug == "archived" and hasattr(obj, "archived_count"):
-        #     return obj.archived_count
+            return getattr(obj, f"{obj.slug}_count", 0)
         return 0
 
-    # documents_count.short_description = "Количество документов"
+    documents_count.short_description = "Количество документов"
+    # documents_count.admin_order_field = "pending_count"
 
 
 @admin.register(Document)
@@ -238,21 +170,20 @@ class DocumentAdmin(admin.ModelAdmin):
         "id",
         "title",
         "status",
+        "get_all_files_links",
         "owner",
         "assigned_admin",
-        "owner",
         "uploaded_at",
         "reviewed_at",
         "review_comment",
         "get_reviewed_by",
-        "file_answer",
+        "get_file_answer",
+        # "file_answer",
     )
 
     list_filter = (
-        "id",
         "status",
     )
-    inlines = [DocumentFileInline]
     search_fields = (
         "title",
         "owner",
@@ -262,51 +193,19 @@ class DocumentAdmin(admin.ModelAdmin):
         "id",
         "title",
         "status",
+        "get_all_files_links",
         "owner",
         "assigned_admin",
         "folder",
         "description",
         "uploaded_at",
-        "review_comment",
         "reviewed_by",
         "reviewed_at",
-        "file_answer",
     ]
-    # fieldsets = (
-    #     (None, {
-    #         'fields': ('title', 'folder', 'status', 'file')
-    #     }),
-    #     ('Дополнительные файлы', {
-    #         'fields': ('additional_files_list',),
-    #         'classes': ('collapse',)
-    #     }),
-    #     ('Системная информация', {
-    #         'fields': ('file_link',),
-    #         'classes': ('collapse',)
-    #     }),
-    # )
-
-    def file_link(self, obj):
-        """Ссылка на основной файл"""
-
-        files = DocumentFile.objects.filter(document=obj.id)
-        if files:
-            links = []
-            for file in files:
-                links.append(format_html(
-                    '<a href="{}" target="_blank" style="font-weight: bold;">📄 ОТКРЫТЬ ОСНОВНОЙ ФАЙЛ</a> | '
-                    '<a href="{}" download>💾 Скачать</a>',
-                    file.url,
-                    file.url
-                ))
-                return links
-        return "У документа нет файлов"
-
-    file_link.short_description = "Файлы документа"
 
     def has_add_permission(self, request, obj=None):
         """Запрет добавлять элементы вручную"""
-        return request.user.is_staff
+        return False
 
     def get_queryset(self, request):
         """
@@ -320,12 +219,13 @@ class DocumentAdmin(admin.ModelAdmin):
 
         return queryset.filter(assigned_admin=request.user)
 
-    # def has_delete_permission(self, request, obj=None):
-    #     """Запрет удаления документов"""
-    #     return False
+    def has_delete_permission(self, request, obj=None):
+        """Запрет удаления документов"""
+        return request.user.is_superuser
 
     def get_reviewed_by(self, obj):
         """Добавляет информацию о проверившем администраторе"""
+
         if obj and obj.reviewed_by:
             return f"{obj.reviewed_by.email} ({obj.reviewed_by.get_full_name()})"
         return "Не проверено"
@@ -333,12 +233,19 @@ class DocumentAdmin(admin.ModelAdmin):
     get_reviewed_by.short_description = "Проверивший администратор"
     get_reviewed_by.admin_order_field = "reviewed_by__email"
 
+    def get_file_answer(self, obj):
+        """Отображает ответный файл документа"""
+
+        if obj.file_answer:
+            return get_file_answer_display(obj.file_answer)
+        return "Документ не найден"
+
+    get_file_answer.short_description = "Ответный файл администратора 📌"
+    get_file_answer.allow_tags = True
+
     def has_change_permission(self, request, obj=None):
         """Разрешение на изменение только своих документов или 'superuser'"""
-
-        if obj:
-            return request.user.is_superuser or obj.assigned_admin == request.user
-        return request.user.is_staff
+        return request.user.is_superuser
 
     def add_view(self, request, form_url="", extra_context=None):
         """Перенаправление при попытке доступа к добавлению"""
@@ -357,6 +264,14 @@ class DocumentAdmin(admin.ModelAdmin):
         Изменить администратора для документов.
         Добавить документы выбранному администратору в очередь
         """
+
+        if not request.user.is_superuser:
+            self.message_user(
+                request,
+                "❌ Только суперпользователь может менять администратора документов",
+                messages.ERROR
+            )
+            return
 
         count = 0
         for document in queryset:
@@ -384,9 +299,29 @@ class DocumentAdmin(admin.ModelAdmin):
                 )
 
         if count > 0:
-            self.message_user(request, f"Администратор изменен для {count} документов", messages.SUCCESS)
+            self.message_user(request, f"✅ Администратор изменен для {count} документов", messages.SUCCESS)
         else:
-            self.message_user(request, "Не удалось изменить администратора", messages.WARNING)
+            self.message_user(request, "⚠️ Не удалось изменить администратора", messages.WARNING)
+
+    def get_actions(self, request):
+        """
+        Показывать 'change_admin_action' только суперпользователям
+        """
+
+        actions = super().get_actions(request)
+
+        if not request.user.is_superuser:
+            if "change_admin_action" in actions:
+                del actions["change_admin_action"]
+
+        return actions
+
+    def get_all_files_links(self, obj):
+        """Отображение файлов документа"""
+        return get_files_display_html(obj.additional_files.all())
+
+    get_all_files_links.short_description = "Файлы документа на согласование"
+    get_all_files_links.allow_tags = True
 
 
 class QueueItemInline(admin.TabularInline):
@@ -428,7 +363,6 @@ class QueueItemInline(admin.TabularInline):
             return queryset
         return queryset.filter(document__assigned_admin=request.user)
 
-
     def get_status(self, obj):
         """Отображает статус документа"""
 
@@ -449,53 +383,13 @@ class QueueItemInline(admin.TabularInline):
 
     get_title.short_description = "Наименование документа"
 
+
     def get_all_files_links(self, obj):
         """Отображает все файлы документа в очереди"""
+
         if not obj.document:
             return "Документ не найден"
-
-        links = []
-        document = obj.document
-        document_files = document.additional_files.all()
-
-        for doc_file in document_files:
-            if doc_file.file:
-                try:
-                    file_name = doc_file.original_name or doc_file.file.name.split('/')[-1]
-                    file_extension = file_name.split('.')[-1].lower() if '.' in file_name else 'file'
-
-                    icon_map = {
-                        'pdf': '📄', 'doc': '📝', 'docx': '📝',
-                        'xls': '📊', 'xlsx': '📊', 'jpg': '🖼',
-                        'jpeg': '🖼', 'png': '🖼', 'zip': '📦', 'rar': '📦'
-                    }
-                    icon = icon_map.get(file_extension, '📁')
-
-                    link_html = format_html(
-                        '<div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">'
-                        '<a href="{}" target="_blank" style="background: #417690; color: white; border: none; padding: 3px 8px; text-decoration: none; border-radius: 3px; display: inline-block; cursor: pointer; font-size: 12px;">'
-                        '🔍'
-                        '</a>'
-                        '<a href="{}" download style="background: #205067; color: white; border: none; padding: 3px 8px; text-decoration: none; border-radius: 3px; display: inline-block; cursor: pointer; font-size: 12px;">'
-                        '⬇️'
-                        '</a>'
-                        '<span style="color: #666; font-size: 13px; margin-left: 5px;">{}</span>'
-                        '</div>',
-                        doc_file.file.url,
-                        doc_file.file.url,
-                        file_name
-                    )
-                    links.append(link_html)
-                    print(doc_file.file.url)
-
-                except Exception as e:
-                    print(f"Ошибка при обработке файла {doc_file.id}: {e}")
-                    continue
-
-        if links:
-            combined_html = ''.join(str(link) for link in links)
-            return mark_safe(combined_html)
-        return "Нет файлов"
+        return get_files_display_html(obj.document.additional_files.all())
 
     get_all_files_links.short_description = "Все файлы документа"
     get_all_files_links.allow_tags = True
@@ -507,10 +401,11 @@ class QueueItemInline(admin.TabularInline):
             kwargs["widget"] = forms.Textarea(
                 attrs={
                     "rows": 5,
-                    "style": "width: 100%; padding: 8px; border: 2px solid #40E0D0; border-radius: 8px;",
+                    "style": "width: 100%; padding: 6px; border: 2px solid #40E0D0; border-radius: 8px;",
                     "placeholder": "Введите комментарий по итогам проверки...",
                 }
             )
+
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
     def document_actions(self, obj):
@@ -526,11 +421,7 @@ class QueueItemInline(admin.TabularInline):
                     💾 Сохранить в документ
                 </button>
                 <div style="display: flex; gap: 10px;">
-                    <a href="../queueitem/{}/approve/" style="background: #2E7D32; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                        ✅ Одобрить
-                    </a>
-                    <a href="../queueitem/{}/reject/" style="background: #205067; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                        ❌ Отклонить
+                    
                     </a>
                 </div>
             </div>
@@ -541,6 +432,18 @@ class QueueItemInline(admin.TabularInline):
         )
 
     document_actions.short_description = "Действия"
+
+    def get_readonly_fields(self, request, obj=None):
+        """Определяем какие поля доступны для редактирования"""
+        base_readonly = [
+            "id", "position", "get_status", "get_title",
+            "added_at", "get_all_files_links", "document_actions"
+        ]
+
+        if request.user.is_superuser or request.user.has_perm("documents.view_all_documents"):
+            return base_readonly
+
+        return base_readonly + ["temp_review_comment", "temp_file_answer"]
 
     def has_add_permission(self, request, obj=None):
         """Запрет добавлять элементы вручную"""
@@ -573,7 +476,6 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
     )
 
     list_filter = (
-        "id",
         "approver",
     )
     search_fields = (
@@ -772,12 +674,11 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         if applied:   # Остаемся на странице
             return None
 
-        # return super().save_model(request, obj, form, change)
-
     def response_change(self, request, obj):
         """Переопределяем редирект после сохранения"""
+
         if "apply" in request.POST:
-            # Остаемся на странице редактирования
+
             from django.http import HttpResponseRedirect
             return HttpResponseRedirect(request.path)
 

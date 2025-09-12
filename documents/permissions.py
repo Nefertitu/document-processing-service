@@ -24,7 +24,7 @@ class IsOwnerOnly(permissions.BasePermission):
 
 
 class IsOwnerOrAdmin(permissions.BasePermission):
-    """Разрешение только для владельца документа"""
+    """Разрешение для владельца документа или админа"""
 
     def has_object_permission(self, request: Request, view: View, obj: HasOwner) -> bool:
         """
@@ -59,4 +59,34 @@ class CanRejectDocument(permissions.BasePermission):
     def has_object_permission(self, request: Request, view: View, obj: Any) -> bool:
         """Проверка права на уровне объекта"""
         return request.user.has_perm("documents.can_reject_document")
+
+
+class CanAccessDocumentFile(permissions.BasePermission):
+    """Полная проверка прав для 'DocumentFile'"""
+
+    def has_permission(self, request, view):
+        """Проверка на уровне запроса"""
+
+        if request.method in permissions.SAFE_METHODS:  # (GET, HEAD, OPTIONS)
+            return True
+        elif view.action in ["create", "list", "retrieve"]:
+            return request.user.is_authenticated
+        elif view.action == "destroy":
+            return request.user.is_superuser
+        else:
+            return False
+
+    def has_object_permission(self, request, view, obj):
+        """Проверка на уровне конкретного объекта"""
+
+        if request.user.is_superuser:
+            return True
+
+        if request.method in permissions.SAFE_METHODS:
+            return (
+                    obj.owner == request.user or
+                    obj.document.assigned_admin == request.user
+            )
+
+        return False
 

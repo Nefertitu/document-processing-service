@@ -13,6 +13,12 @@ from django.db import models, transaction
 from django.db.models import Count
 from django.utils import timezone
 
+from django_celery_beat.models import PeriodicTask, IntervalSchedule
+from datetime import timedelta
+
+from rest_framework.response import Response
+from rest_framework import status
+
 from .tasks import archive_old_documents, send_single_document_email
 
 
@@ -60,28 +66,55 @@ class DocumentFilePathGeneratorService:
 
 
 class DocumentHeavyProcessingService :
-    """Класс для тяжелых операций"""
+    """Сервис для тяжелых операций с документами"""
+
+    MAX_SIZE_MB = 0.1
+    MAX_WIDTH = 1200
+    MAX_HEIGHT = 800
 
     @staticmethod
     def optimize_image(image_file):
         """Сжимает и оптимизирует изображение"""
 
-        print(f"Получен файл: {image_file.name}, размер: {image_file.size}")
+        file_size = image_file.size
+        file_size_mb = image_file.size / (1024 * 1024)
+
+        if file_size_mb < DocumentHeavyProcessingService.MAX_SIZE_MB:
+            print(f"📦 Файл {image_file.name} ({file_size_mb:.2f} MB) слишком мал для оптимизации")
+            return None
+
+        print(f"⚙️ Оптимизируем: {image_file.name} ({file_size_mb:.1f} MB)")
+
         try:
             img = Image.open(image_file)
-            print(f"🖼 Изображение открыто: {img.size}, формат: {img.format}")
+            print(f"🖼 Исходный размер: {img.size}")
+            original_size = img.size
 
-            img = img.resize((1200, 800), Image.Resampling.LANCZOS)
+            if img.size[0] > DocumentHeavyProcessingService.MAX_WIDTH  or img.size[1] > DocumentHeavyProcessingService.MAX_HEIGHT:
+                img.thumbnail(
+                    (DocumentHeavyProcessingService.MAX_WIDTH, DocumentHeavyProcessingService.MAX_HEIGHT),
+                    Image.Resampling.LANCZOS
+                )
+                print(f"📐 Новый размер: {img.size}")
 
             output = io.BytesIO()
-            img.save(output, format="JPEG", quality=85, optimize=True)
-            print(f"Оптимизирован файл {img}, размер после оптимизации {img.size}")
+
+            if img.format == "PNG":
+                if img.mode in ("RGBA", "LA"):
+                    img = img.convert("RGB")
+                img.save(output, format="JPEG", quality=85, optimize=True)
+            else:
+                img.save(output, format=img.format, quality=85, optimize=True)
+
+
             output.seek(0)
+            print(f"✅ Оптимизация завершена")
 
             return output
+
         except Exception as e:
             print(f"❌ Ошибка: {e}")
-            raise
+            return None
 
 def get_next_available_admin(exclude_admin=None):
     """Возвращает следующего доступного администратора"""
@@ -135,11 +168,17 @@ class FolderService:
             folder = Folder.objects.get(slug=folder_slug)
             print(f"Найдена папка: {folder.title}")
 
+            old_folder = document.folder
+            old_status = document.status
+
             document.folder = folder
+            document.status = folder_slug
             document.save()
 
-            print(f"✅ Документ '{document.title}' перемещен в папку '{folder.title}'")
-            print(f"Текущая папка документа: {document.folder}")
+            print(f"✅ Документ '{document.title}' перемещен:")
+            print(f"   Папка: {old_folder} → {document.folder}")
+            print(f"   Статус: {old_status} → {document.status}")
+
             return True
 
         except Folder.DoesNotExist:
@@ -174,20 +213,34 @@ class DocumentService:
 
         document = Document.objects.create(**validated_data, owner=user)
 
+        print(f"📄 Создан документ {document.id} с {len(files_data)} файлами")
+
+        if not files_data:
+            if document:
+                document.delete()
+            raise ValidationError("Загрузите хотя бы один файл")
+            # return Response(
+            #     {"error": "Загрузите хотя бы один файл"},
+            #     status=status.HTTP_400_BAD_REQUEST
+            # )
+        file_validator = DocumentFileValidator()
 
         for file_data in files_data:
-            DocumentFile.objects.create(
+            document_file = DocumentFile.objects.create(
                 document=document,
                 file=file_data,
-                original_name=file_data.name,
                 owner=user
             )
-            # if file_data and file_data.name.lower().endswith((".jpg", ".jpeg", ".png")):
-            #     print(f"Загружается файл типа {type(document.file_data)}")
-            #
-            #     from .tasks import optimize_image_task
-            #
-            #     optimize_image_task.delay(document.pk)
+            print(f"📝 Создан DocumentFile ID: {document_file.id}")
+            print(f"📦 Имя файла: {document_file.file.name}")
+            print(f"📊 Размер: {document_file.file.size}")
+
+            if file_data and file_data.name.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp")):
+                print(f"🚀 Запуск оптимизации для файла: {file_data.name}")
+
+                from .tasks import optimize_image_task
+
+                optimize_image_task.delay(document_file.pk)
 
         if not document.assigned_admin:
             document.assign_admin()
@@ -200,7 +253,7 @@ class DocumentService:
         return document
 
     @staticmethod
-    def handle_queue_action(item_id, user, action):
+    def handle_queue_action(item_id, user, action, temp_review_comment="", temp_file_answer=None):
         """Обработка действий с документом в очереди (одобрение/отклонение)"""
 
         from .models import QueueItem
@@ -209,6 +262,8 @@ class DocumentService:
         try:
             queue_item = QueueItem.objects.select_related("document", "queue").get(id=item_id)
             document = queue_item.document
+            # review_comment = document.review_comment
+            # file_answer = document.file_answer
 
             print(f"Обработка документа: {document.title}, статус: {document.status}")
 
@@ -222,6 +277,10 @@ class DocumentService:
                 document.status = "approved"
                 message = f"Документ '{document.title}' одобрен"
                 document.reviewed_at = timezone.localtime()
+                # if review_comment:
+                #     document.review_comment = review_comment
+                # if file_answer:
+                #     document.file_answer = file_answer
                 document.reviewed_by = user
                 document.save()
                 send_single_document_email.delay(
@@ -232,11 +291,14 @@ class DocumentService:
                 FolderService.move_to_approved(document)
                 archive_old_documents.delay()
 
-
             elif action == "reject":
                 document.status = "rejected"
                 message = f"Документ '{document.title}' отклонен"
                 document.reviewed_at = timezone.localtime()
+                # if review_comment:
+                #     document.review_comment = review_comment
+                # if file_answer:
+                #     document.file_answer = file_answer
                 document.reviewed_by = user
                 document.save()
                 send_single_document_email.delay(
@@ -400,8 +462,6 @@ class QueueService:
             return None
 
 
-
-
     @staticmethod
     def get_or_create_queue(admin):
         """Получает или создает очередь для администратора"""
@@ -462,3 +522,33 @@ class QueueService:
             approval_queue.save()
             return True
         return False
+
+
+def setup_task_archive_old_documents(document_id):
+    """Устанавливаем расписание для выполнения переноса документов в папку 'архив'"""
+
+    from .models import Document
+
+    document = Document.objects.get(id=document_id)
+
+    if document:
+
+        if not PeriodicTask.objects.filter(task='documents.tasks.archive_old_documents').exists():
+            schedule, created = IntervalSchedule.objects.get_or_create(
+                every=5,
+                period=IntervalSchedule.MINUTES,
+            )
+
+            task, created = PeriodicTask.objects.get_or_create(
+                name='Archive old documents daily',
+                task='documents.tasks.archive_old_documents',
+                interval=schedule,
+                enabled=True,
+            )
+
+            print("✅ Задача создана!")
+
+        else:
+            print("ℹ️ Задача архивации уже существует")
+
+

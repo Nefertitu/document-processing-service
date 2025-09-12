@@ -85,7 +85,7 @@ class Document(models.Model):
     )
     title = models.CharField(
         max_length=200,
-        verbose_name="Название документа",
+        verbose_name="Наименование документа",
         help_text="Укажите название документа",
     )
     description = models.TextField(
@@ -197,7 +197,7 @@ class DocumentFile(models.Model):
     file = models.FileField(
         verbose_name="Расположение vs название файла",
         upload_to="DocumentFilePathGeneratorService.user_document_path",
-        help_text="Введите название файла",
+        help_text="Загрузите файл",
     )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -209,6 +209,7 @@ class DocumentFile(models.Model):
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
     original_name = models.CharField(max_length=255)
+
 
     def save(self, *args, **kwargs):
         """Определяет способ записи наименования файла"""
@@ -224,7 +225,7 @@ class DocumentFile(models.Model):
 
     def __str__(self) -> str:
         """Строковое отображение модели Файл"""
-        return f"{self.file.name}"
+        return f"{self.file.url}"
 
 
 class ApprovalQueueManager(models.Manager):
@@ -268,7 +269,7 @@ class ApprovalQueue(models.Model):
         ordering = ["approver"]
 
     def __str__(self) -> str:
-        return f"{self.title} ({self.approver.full_name})"
+        return f"{self.title} ({self.approver.full_name}), документов в очереди: {self.items.all().count()}"
 
     def get_next_position(self) -> int:
         """Следующая позиция в очереди"""
@@ -277,9 +278,9 @@ class ApprovalQueue(models.Model):
         print(f"Последняя позиция в очереди: {max_position if max_position else 0}")
         return (max_position or 0) + 1
 
-    def get_next_document(self):
-        """Получить следующий документ для обработки"""
-        return self.items.order_by("position").first()
+    # def get_next_document(self):
+    #     """Получить следующий документ для обработки"""
+    #     return self.items.order_by("position").first()
 
     def reorganize(self):
         """Пересчитывает позиции элементов в очереди"""
@@ -287,6 +288,8 @@ class ApprovalQueue(models.Model):
 
 
 class QueueItemManager(models.Manager):
+    """Модель менеджер очереди"""
+
     def create_with_position(self, **kwargs):
         """Создает элемент очереди с автоматическим определением позиции"""
         from .services import QueueService
@@ -355,6 +358,10 @@ class QueueItem(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["queue", "document"], name="unique_document_in_queue"),
             models.UniqueConstraint(fields=["queue", "position"], name="unique_position_in_queue"),
+        ]
+        permissions = [
+            ("can_review_documents", "Может проверять документы"),
+            ("can_upload_answer_file", "Может загружать ответные файлы"),
         ]
 
     def get_document(self):

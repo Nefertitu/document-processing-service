@@ -1,20 +1,15 @@
 # from django.db.models.signals import post_save
 # from django.dispatch import receiver
+# from .models import QueueItem
 #
 #
-# @receiver(post_save)
-# def handle_new_document(sender, instance, created, **kwargs):
-#     """Обработка нового документа"""
+# @receiver(post_save, sender=QueueItem)
+# def transfer_data_to_document(sender, instance, **kwargs):
+#     """Переносит данные из QueueItem в Document после сохранения"""
+#     if hasattr(instance, 'temp_review_comment') and instance.temp_review_comment:
+#         instance.document.review_comment = instance.temp_review_comment
+#         instance.document.save()
 #
-#     from .models import ApprovalQueue, Document
-#     if sender == Document:
-#         if created and instance.status == "pending" and not instance.assigned_admin:
-#             admin = instance.assign_admin()
-#             admin.save()
-#
-#             if admin:
-#                 queue, created = ApprovalQueue.objects.get_or_create(approver=admin)
-#                 queue.add_document(instance)
-#         elif instance.status in ['approved', 'rejected'] and not instance.reviewed_by:
-#             from django.contrib.auth import get_user_model
-#             User = get_user_model()
+#     if hasattr(instance, 'temp_file_answer') and instance.temp_file_answer:
+#         instance.document.file_answer = instance.temp_file_answer
+#         instance.document.save()
