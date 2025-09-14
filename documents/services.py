@@ -18,7 +18,7 @@ from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
-from .models import Document
+
 from .tasks import archive_old_documents, send_single_document_email
 from .validators import DocumentFileValidator
 
@@ -359,6 +359,8 @@ class DocumentService:
 
     def set_reviewed_at(self, document_id: int):
         """Устанавливает время утверждения документа"""
+
+        from .models import Document
 
         document = Document.objects.get(pk=document_id)
 

@@ -1,3 +1,4 @@
+import os
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
@@ -9,7 +10,6 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
 from documents.utils.file_display import get_file_answer_display, get_files_display_html
-
 from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
 from .services import DocumentService, QueueService, get_next_available_admin
 from .tasks import send_single_document_email
@@ -51,6 +51,9 @@ class DocumentInline(admin.TabularInline):
             },
         ),
     )
+    list_per_page = 10
+    list_max_show_all = 100
+    show_full_result_count = True
 
     def get_queryset(self, request):
         """
@@ -196,6 +199,11 @@ class DocumentAdmin(admin.ModelAdmin):
         "reviewed_by",
         "reviewed_at",
     ]
+
+    list_per_page = 10
+    list_max_show_all = 100
+    show_full_result_count = True
+    extra = 0
 
     def has_add_permission(self, request, obj=None):
         """Запрет добавлять элементы вручную"""
@@ -344,6 +352,10 @@ class QueueItemInline(admin.TabularInline):
     ]
     can_delete = False
 
+    list_per_page = 10
+    list_max_show_all = 100
+    show_full_result_count = True
+
     def get_queryset(self, request):
         """Показываем только документы со статусом 'pending'"""
 
@@ -412,6 +424,11 @@ class QueueItemInline(admin.TabularInline):
                     💾 Сохранить в документ
                 </button>
                 <div style="display: flex; gap: 10px;">
+                <a href="../queueitem/{}/approve/" style="background: #2E7D32; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                        ✅ Одобрить
+                    </a>
+                    <a href="../queueitem/{}/reject/" style="background: #205067; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                        ❌ Отклонить
                     </a>
                 </div>
             </div>
@@ -665,7 +682,6 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         """Переопределяем редирект после сохранения"""
 
         if "apply" in request.POST:
-
             from django.http import HttpResponseRedirect
 
             return HttpResponseRedirect(request.path)
@@ -723,6 +739,11 @@ class QueueItemAdmin(admin.ModelAdmin):
         "temp_review_comment",
         "temp_file_answer",
     )
+
+    list_per_page = 10
+    list_max_show_all = 100
+    show_full_result_count = True
+    extra = 0
 
     def get_queryset(self, request):
         """Показываем только документы со статусом 'pending'"""
