@@ -45,7 +45,7 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
             print(f"Результат отправки: {result}")
 
         elif status == "approved":
-            subject = "✅ Ваш документ подтвержден"
+            subject = "✅ Ваш документ подтвержден!"
             message = f"Документ '{document.title}' был подтвержден."
 
             if comment:
@@ -64,7 +64,7 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
             print(f"Результат отправки: {result}")
 
         elif status == "rejected":
-            subject = "❌ Ваш документ отклонен"
+            subject = "❌ Ваш документ отклонен!"
             message = f"Документ '{document.title}' был отклонен."
 
             if comment:
@@ -93,13 +93,15 @@ def optimize_image_task(document_file_id):
 
     print(f"🎯 START: Задача оптимизации для файла ID: {document_file_id}")
 
+    from .models import Document, DocumentFile
+    from .services import DocumentHeavyProcessingService
+
     try:
-        from .models import Document, DocumentFile
-        from .services import DocumentHeavyProcessingService
-        import os
 
         print(f"🔍 Поиск файла с ID: {document_file_id}")
+
         document_file = DocumentFile.objects.get(id=document_file_id)
+
         print(f"✅ Файл найден: {document_file.id}")
         print(f"🔄 Начинаем оптимизацию файла ID: {document_file_id}")
         print(
@@ -109,8 +111,8 @@ def optimize_image_task(document_file_id):
         if not document_file.file:
             print(f"❌ У файла нет содержимого")
             return
-        print("Найдены файлы оптимизации")
 
+        print("Найдены файлы оптимизации")
         print(f"📁 Обрабатываем: {document_file.file.name}")
         original_filename = os.path.basename(document_file.file.name)
         print(f"🔄 Оптимизация файла: {original_filename} (ID: {document_file_id})")
@@ -125,7 +127,6 @@ def optimize_image_task(document_file_id):
                 optimized_image,
                 save=True
             )
-            # print(f"✅ Успешно оптимизирован файл ! Размер: {len(optimized_image.getvalue())} bytes")
             print(f"✅ Файл {original_filename} оптимизирован и сохранен")
             return "success"
         else:
@@ -172,8 +173,6 @@ def archive_old_documents():
             try:
                 print(f"Переносим в архив документ {document.id}: {document.title}")
 
-
-
                 if FolderService.move_to_archive(document):
                     print(f"Статус документа после переноса: {document.status}")
 
@@ -193,3 +192,4 @@ def archive_old_documents():
     except Exception as e:
         print(f"✗ Ошибка переноса документов в архив: {e}")
         return 0
+

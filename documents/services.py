@@ -8,18 +8,22 @@ from PIL import Image
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+# from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models, transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from django_celery_beat.models import PeriodicTask, IntervalSchedule
 from datetime import timedelta
 
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework import status
+from rest_framework import serializers
 
 from .tasks import archive_old_documents, send_single_document_email
+from .validators import DocumentFileValidator
 
 
 User = get_user_model()
@@ -37,13 +41,13 @@ class DocumentFilePathGeneratorService:
     def admin_document_path(instance: models.Model, filename: str) -> str:
         """Путь для файлов, загружаемых администраторами"""
 
-        admin_id = getattr(instance.assigned_admin, "id", "system")
+        admin_id = getattr(instance.document.assigned_admin, "id", "system")
         return DocumentFilePathGeneratorService._generate_path(filename, "admin", admin_id)
 
-    @staticmethod
-    def archived_document_path(instance: models.Model, filename: str) -> str:
-        """Путь для архивных документов"""
-        return DocumentFilePathGeneratorService._generate_path(filename, "archive", instance.owner.pk)
+    # @staticmethod   # использование метода возможно при реализации цикла работы с архивными документами
+    # def archived_document_path(instance: models.Model, filename: str) -> str:
+    #     """Путь для архивных документов"""
+    #     return DocumentFilePathGeneratorService._generate_path(filename, "archive", instance.owner.pk)
 
     @staticmethod
     def _generate_path(filename: str, prefix: str, user_id: Optional[int]) -> str:
@@ -116,22 +120,48 @@ class DocumentHeavyProcessingService :
             print(f"❌ Ошибка: {e}")
             return None
 
+    def generate_test_image_content(width=1000, height=1000, format='JPEG'):
+        """Генерирует тестовое изображение в памяти"""
+
+        from PIL import Image, ImageDraw
+        import io
+
+        # Создаем изображение с градиентом
+        img = Image.new('RGB', (width, height), color='red')
+        draw = ImageDraw.Draw(img)
+
+        # Добавляем некоторые детали, чтобы увеличить размер файла
+        for i in range(0, width, 50):
+            draw.line([(i, 0), (i, height)], fill='blue', width=2)
+        for i in range(0, height, 50):
+            draw.line([(0, i), (width, i)], fill='green', width=2)
+
+        # Сохраняем в BytesIO
+        output = io.BytesIO()
+        img.save(output, format=format, quality=95)  # Высокое качество = большой размер
+        output.seek(0)
+
+        return output.getvalue()
+
 def get_next_available_admin(exclude_admin=None):
     """Возвращает следующего доступного администратора"""
 
     from documents.models import QueueItem
 
-    active_admins = User.objects.filter(is_staff=True, is_superuser=False, approval_queue__is_stop=False).distinct()
+    active_admins = User.objects.filter(
+        is_staff=True,
+        is_superuser=False,
+        approval_queue__is_stop=False
+    ).annotate(
+        task_count=Count("approval_queue", filter=Q(approval_queue__is_stop=False))
+    ).distinct()
 
     if exclude_admin:
         active_admins = active_admins.exclude(id=exclude_admin.pk)
 
     if active_admins.exists():
 
-        selected_admin = min(
-            active_admins,
-            key=lambda admin: QueueItem.objects.filter(queue__approver=admin, queue__is_stop=False).count(),
-        )
+        selected_admin = active_admins.order_by("task_count").first()
         print(f"Выбран администратор: {selected_admin.email}")
         return selected_admin
 
@@ -189,7 +219,7 @@ class FolderService:
             return False
 
     @staticmethod
-    def move_to_archive(document):
+    def      move_to_archive(document):
         """Перемещает в архив"""
         return FolderService.move_to_folder(document, "archived")
 
@@ -203,6 +233,18 @@ class DocumentService:
 
         from .models import ApprovalQueue, Document, Folder, QueueItem, DocumentFile
 
+        if not files_data:
+            raise DjangoValidationError("Загрузите хотя бы один файл!")
+
+        file_validator = DocumentFileValidator()
+
+        # Проверяем все файлы перед созданием документа
+        for file_data in files_data:
+            try:
+                file_validator({"file": file_data})
+            except DRFValidationError as e:
+                raise DjangoValidationError(e.detail)
+
         try:
             pending_folder = Folder.objects.get(slug="pending")
             validated_data["folder"] = pending_folder
@@ -214,16 +256,6 @@ class DocumentService:
         document = Document.objects.create(**validated_data, owner=user)
 
         print(f"📄 Создан документ {document.id} с {len(files_data)} файлами")
-
-        if not files_data:
-            if document:
-                document.delete()
-            raise ValidationError("Загрузите хотя бы один файл")
-            # return Response(
-            #     {"error": "Загрузите хотя бы один файл"},
-            #     status=status.HTTP_400_BAD_REQUEST
-            # )
-        file_validator = DocumentFileValidator()
 
         for file_data in files_data:
             document_file = DocumentFile.objects.create(
@@ -533,15 +565,15 @@ def setup_task_archive_old_documents(document_id):
 
     if document:
 
-        if not PeriodicTask.objects.filter(task='documents.tasks.archive_old_documents').exists():
+        if not PeriodicTask.objects.filter(task="documents.tasks.archive_old_documents").exists():
             schedule, created = IntervalSchedule.objects.get_or_create(
                 every=5,
                 period=IntervalSchedule.MINUTES,
             )
 
             task, created = PeriodicTask.objects.get_or_create(
-                name='Archive old documents daily',
-                task='documents.tasks.archive_old_documents',
+                name="Archive old documents daily",
+                task="documents.tasks.archive_old_documents",
                 interval=schedule,
                 enabled=True,
             )

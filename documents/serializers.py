@@ -65,7 +65,7 @@ class FolderSerializer(serializers.ModelSerializer):
             "slug",
             "created_at",
         )
-        validators = [TitleValidator(field="title"), DocumentFileValidator(field="file")]
+        validators = [TitleValidator(field="title"), DocumentFileValidator()]
 
     def get_documents_in_folder(self, obj: Folder) -> int:
         """Возвращает аннотированное количество документов для папки"""

@@ -10,9 +10,9 @@ from rest_framework.exceptions import ValidationError
 class DocumentFileValidator:
     """Класс-валидатор для проверки поля 'file' экземпляра 'Document'"""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, max_size=4*1024*1024) -> None:
         """Класс-валидатор работает с фиксированными полями"""
-        pass
+        self.max_size = max_size
 
     def __call__(self, data: dict) -> None:
         """
@@ -26,12 +26,15 @@ class DocumentFileValidator:
         if not file_data:
             raise serializers.ValidationError()
 
-        max_size = 4 * 1024 * 1024
+        # max_size = 4 * 1024 * 1024
 
-        if file_data.size > max_size:
+        if file_data.size > self.max_size:
+            size_mb = file_data.size / (1024 * 1024)
+            max_size_mb = self.max_size / (1024 * 1024)
+
             raise serializers.ValidationError(
-                f"'file': Файл слишком большой ({filesizeformat(file_data.size)})! "
-                f"Допустимый размер - до {filesizeformat(max_size)}."
+                f"Файл '{file_data.name}' слишком большой ({size_mb:.1f} MB)! "
+                f"Допустимый размер - до {max_size_mb:.1f} MB."
             )
 
 
