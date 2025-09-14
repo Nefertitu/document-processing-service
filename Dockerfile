@@ -11,18 +11,18 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 ENV POETRY_HOME=/opt/poetry
-ENV POETRY_VERSION=1.8.2
+ENV POETRY_VERSION=2.2.0
 ENV PATH="$POETRY_HOME/bin:$PATH"
 RUN curl -sSL https://install.python-poetry.org | python3 - --version $POETRY_VERSION
 
 WORKDIR /app
 
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml poetry.lock* /app/
 
 RUN poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --only main --no-root
 
-COPY . .
+COPY . /app
 
 RUN adduser --disabled-password --gecos '' appuser
 
