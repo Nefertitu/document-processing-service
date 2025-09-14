@@ -13,7 +13,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Sync files to server
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
