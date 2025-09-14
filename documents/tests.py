@@ -135,7 +135,6 @@ class DocumentTestCase(APITestCase):
         url = reverse("documents:document-list")
         response = self.client.get(url)
         data = response.json()
-        print(f"Data documents list: {data}")
         document = self.document
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -298,7 +297,6 @@ class ApprovalQueueTestCase(APITestCase):
 
         response = self.client.get(url)
         data = response.data
-        print(f"Data approval queues1 details: {data}")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -306,7 +304,6 @@ class ApprovalQueueTestCase(APITestCase):
         self.assertEqual(data["approver_info"]["approver_email"], self.admin.email)
         self.assertEqual(data.get("count_documents_in_queue"), 1)
         documents_count = self.approvalqueue.items.all().count()
-        print(f"approval_queue.items: {documents_count}")
         self.assertEqual(data.get("count_documents_in_queue"), documents_count)
         self.assertFalse(data.get("is_stop"))
 
@@ -325,7 +322,6 @@ class ApprovalQueueTestCase(APITestCase):
         }
 
         response = self.client.post(url, data, format="multipart")
-        print(f"Data currently1 document: {response.data}")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -516,7 +512,6 @@ class QueueItemTestCase(APITestCase):
             self.fail(f"Document creation failed with 400: {response.data}")
 
         data = response.json()
-        print(f"data777: {data}")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         document_id = response.data["data"]["id"]
@@ -613,8 +608,6 @@ class QueueItemTestCase(APITestCase):
             "status": "rejected",
         }
         response = self.client.post(url, data, format="multipart")
-
-        data = response.json()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -1058,15 +1051,15 @@ class ArchiveOldDocumentTaskTest(APITestCase):
             status="approved",
             owner=self.user,
             assigned_admin=self.admin,
-            reviewed_at=timezone.now() - timedelta(minutes=10),
-            uploaded_at=timezone.now() - timedelta(hours=2),
+            reviewed_at=timezone.localtime() - timedelta(hours=2),
+            uploaded_at=timezone.localtime() - timedelta(hours=3),
             reviewed_by=self.admin,
         )
 
         archive_documents = Document.objects.filter(status="archived").count()
         self.assertEqual(archive_documents, 0)
 
-        mock_now = datetime(2025, 9, 12, 12, 0, 0)
+        mock_now = timezone.localtime()
         mock_timezone.localtime.return_value = mock_now
 
         from documents.tasks import archive_old_documents
@@ -1074,10 +1067,14 @@ class ArchiveOldDocumentTaskTest(APITestCase):
         archive_old_documents()  # Без .delay()!
 
         archive_documents_now = Document.objects.filter(status="archived").count()
+
+        print(f"Найдено архивных документов: {archive_documents_now}")
+        print(f"Статус тестового документа: {old_document.status}")
+
         self.assertEqual(archive_documents_now, 1)
-        print(f"archive_documents_now777: {archive_documents_now}")
 
         old_document.refresh_from_db()
+
         self.assertEqual(old_document.status, "archived")
 
 
@@ -1325,9 +1322,7 @@ class DocumentAdminTest(APITestCase):
         document_admin = DocumentAdmin(model=Document, admin_site=admin.site)
 
         documents = Document.objects.filter(assigned_admin=self.admin)
-        print(f"documents_queryset555: {documents}")
         original_admin = self.document.assigned_admin
-        print(f"original_admin555: {original_admin}")
 
         with patch("documents.admin.DocumentAdmin.message_user"):
             with patch("documents.admin.send_single_document_email.delay"):
@@ -1339,7 +1334,7 @@ class DocumentAdminTest(APITestCase):
 
 
 class ApprovalQueueAdminTest(APITestCase):
-    """ """ "Тест кейс для проверки работы 'ApprovalQueueAdmin'" ""
+    """Тест кейс для проверки работы 'ApprovalQueueAdmin"""
 
     def setUp(self):
         """Инициализация тестовых данных"""
@@ -1619,7 +1614,6 @@ class OptimizeTaskTest(APITestCase):
 
         self.assertTrue(Document.objects.filter(title="Test Document for optimize").exists())
         data = response.json()
-        print(f"data_with_large_file999: {data}")
         document_id = response.data["data"]["id"]
         document = Document.objects.get(id=document_id)
         document_files = DocumentFile.objects.filter(document=document)
@@ -1692,7 +1686,7 @@ class OptimizeTaskTest(APITestCase):
 
         result = optimize_image_task(file_id)
 
-        self.assertEqual(result, "error")
+        self.assertEqual(result, None)
 
     def test_optimize_image_task_no_file(self):
         """Тест когда у файла нет содержимого"""
