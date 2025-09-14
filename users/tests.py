@@ -69,11 +69,14 @@ class UserTestCase(APITestCase):
             self.assertEqual(serializer_class.__name__, "UserProfileSerializer")
             self.assertEqual(data.get("first_name"), "First Test User")
             self.assertEqual(data.get("id"), self.user.pk)
+
     #
     def test_user_delete(self) -> None:
         """Тест удаления пользователя"""
 
-        superuser = User.objects.create(email="newsuperuser@example.com", password="123www", is_superuser=True, is_staff=True)
+        superuser = User.objects.create(
+            email="newsuperuser@example.com", password="123www", is_superuser=True, is_staff=True
+        )
         self.client.force_authenticate(user=superuser)
         user_to_delete = User.objects.create(email="todelete@example.com", first_name="User to delete")
 

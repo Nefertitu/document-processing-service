@@ -1,30 +1,26 @@
-import os
 import io
+import os
 import uuid
-
+from datetime import timedelta
 from typing import Optional
-
-from PIL import Image
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+
 # from django.core.exceptions import ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models, transaction
 from django.db.models import Count, Q
 from django.utils import timezone
-
-from django_celery_beat.models import PeriodicTask, IntervalSchedule
-from datetime import timedelta
-
-from rest_framework.response import Response
+from django_celery_beat.models import IntervalSchedule, PeriodicTask
+from PIL import Image
+from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError as DRFValidationError
-from rest_framework import status
-from rest_framework import serializers
+from rest_framework.response import Response
 
+from .models import Document
 from .tasks import archive_old_documents, send_single_document_email
 from .validators import DocumentFileValidator
-
 
 User = get_user_model()
 
@@ -69,7 +65,7 @@ class DocumentFilePathGeneratorService:
         return os.path.join("temp_uploads", unique_filename)
 
 
-class DocumentHeavyProcessingService :
+class DocumentHeavyProcessingService:
     """Сервис для тяжелых операций с документами"""
 
     MAX_SIZE_MB = 0.1
@@ -80,7 +76,6 @@ class DocumentHeavyProcessingService :
     def optimize_image(image_file):
         """Сжимает и оптимизирует изображение"""
 
-        file_size = image_file.size
         file_size_mb = image_file.size / (1024 * 1024)
 
         if file_size_mb < DocumentHeavyProcessingService.MAX_SIZE_MB:
@@ -92,12 +87,14 @@ class DocumentHeavyProcessingService :
         try:
             img = Image.open(image_file)
             print(f"🖼 Исходный размер: {img.size}")
-            original_size = img.size
 
-            if img.size[0] > DocumentHeavyProcessingService.MAX_WIDTH  or img.size[1] > DocumentHeavyProcessingService.MAX_HEIGHT:
+            if (
+                img.size[0] > DocumentHeavyProcessingService.MAX_WIDTH
+                or img.size[1] > DocumentHeavyProcessingService.MAX_HEIGHT
+            ):
                 img.thumbnail(
                     (DocumentHeavyProcessingService.MAX_WIDTH, DocumentHeavyProcessingService.MAX_HEIGHT),
-                    Image.Resampling.LANCZOS
+                    Image.Resampling.LANCZOS,
                 )
                 print(f"📐 Новый размер: {img.size}")
 
@@ -110,9 +107,8 @@ class DocumentHeavyProcessingService :
             else:
                 img.save(output, format=img.format, quality=85, optimize=True)
 
-
             output.seek(0)
-            print(f"✅ Оптимизация завершена")
+            print("✅ Оптимизация завершена")
 
             return output
 
@@ -120,21 +116,22 @@ class DocumentHeavyProcessingService :
             print(f"❌ Ошибка: {e}")
             return None
 
-    def generate_test_image_content(width=1000, height=1000, format='JPEG'):
+    def generate_test_image_content(width=1000, height=1000, format="JPEG"):
         """Генерирует тестовое изображение в памяти"""
 
-        from PIL import Image, ImageDraw
         import io
 
+        from PIL import Image, ImageDraw
+
         # Создаем изображение с градиентом
-        img = Image.new('RGB', (width, height), color='red')
+        img = Image.new("RGB", (width, height), color="red")
         draw = ImageDraw.Draw(img)
 
         # Добавляем некоторые детали, чтобы увеличить размер файла
         for i in range(0, width, 50):
-            draw.line([(i, 0), (i, height)], fill='blue', width=2)
+            draw.line([(i, 0), (i, height)], fill="blue", width=2)
         for i in range(0, height, 50):
-            draw.line([(0, i), (width, i)], fill='green', width=2)
+            draw.line([(0, i), (width, i)], fill="green", width=2)
 
         # Сохраняем в BytesIO
         output = io.BytesIO()
@@ -143,18 +140,17 @@ class DocumentHeavyProcessingService :
 
         return output.getvalue()
 
+
 def get_next_available_admin(exclude_admin=None):
     """Возвращает следующего доступного администратора"""
 
     from documents.models import QueueItem
 
-    active_admins = User.objects.filter(
-        is_staff=True,
-        is_superuser=False,
-        approval_queue__is_stop=False
-    ).annotate(
-        task_count=Count("approval_queue", filter=Q(approval_queue__is_stop=False))
-    ).distinct()
+    active_admins = (
+        User.objects.filter(is_staff=True, is_superuser=False, approval_queue__is_stop=False)
+        .annotate(task_count=Count("approval_queue", filter=Q(approval_queue__is_stop=False)))
+        .distinct()
+    )
 
     if exclude_admin:
         active_admins = active_admins.exclude(id=exclude_admin.pk)
@@ -219,7 +215,7 @@ class FolderService:
             return False
 
     @staticmethod
-    def      move_to_archive(document):
+    def move_to_archive(document):
         """Перемещает в архив"""
         return FolderService.move_to_folder(document, "archived")
 
@@ -231,7 +227,7 @@ class DocumentService:
     def create_document(validated_data, user, files_data):
         """Создание документа с бизнес-логикой"""
 
-        from .models import ApprovalQueue, Document, Folder, QueueItem, DocumentFile
+        from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
 
         if not files_data:
             raise DjangoValidationError("Загрузите хотя бы один файл!")
@@ -258,11 +254,7 @@ class DocumentService:
         print(f"📄 Создан документ {document.id} с {len(files_data)} файлами")
 
         for file_data in files_data:
-            document_file = DocumentFile.objects.create(
-                document=document,
-                file=file_data,
-                owner=user
-            )
+            document_file = DocumentFile.objects.create(document=document, file=file_data, owner=user)
             print(f"📝 Создан DocumentFile ID: {document_file.id}")
             print(f"📦 Имя файла: {document_file.file.name}")
             print(f"📊 Размер: {document_file.file.size}")
@@ -346,16 +338,11 @@ class DocumentService:
 
             QueueService.reorganize_queue(queue_item.queue)
 
-            return {
-                "success": True,
-                "message": message,
-                "document_id": document.pk
-            }
+            return {"success": True, "message": message, "document_id": document.pk}
 
         except Exception as e:
             print(f"Ошибка при обработке: {str(e)}")
             return {"success": False, "message": f"Ошибка: {str(e)}"}
-
 
     @staticmethod
     def move_to_new_queue(document, new_admin):
@@ -374,9 +361,8 @@ class DocumentService:
         """Устанавливает время утверждения документа"""
 
         document = Document.objects.get(pk=document_id)
-        user = self.request.user
 
-        if document and approve_document(self, request, object_id, item_id) or reject_document():
+        if document.status in ["approved", "rejected"]:
             now = timezone.localtime()
             document.reviewed_at = now
             document.save()
@@ -395,25 +381,20 @@ class QueueService:
         print(f"Попытка добавить документ {document.title} в очередь")
 
         if not document.assigned_admin:
-            print(f"Администратор: None - документ не будет добавлен в очередь")
-            return False
+            print("Администратор: None - документ не будет добавлен в очередь")
+            return None
 
         print(f"Администратор: {document.assigned_admin.email}")
 
         try:
-            active_queues = ApprovalQueue.objects.filter(
-                approver=document.assigned_admin,
-                is_stop=False
-            ).annotate(
-            items_count=Count("items")
-        )
+            active_queues = ApprovalQueue.objects.filter(approver=document.assigned_admin, is_stop=False).annotate(
+                items_count=Count("items")
+            )
 
             if not active_queues.exists():
                 # Создаем новую очередь если нет активных
-                queue = ApprovalQueue.objects.create(
-                    approver=document.assigned_admin,
-                    is_stop=False
-                )
+                queue = ApprovalQueue.objects.create(approver=document.assigned_admin, is_stop=False)
+                print(f"Создана новая очередь: {queue.id}")
 
             elif active_queues.count() == 1:
                 queue = active_queues.first()
@@ -422,25 +403,22 @@ class QueueService:
                 queue = active_queues.order_by("items_count").first()
                 print(f"Выбрана очередь {queue.id} с {queue.items_count} документами")
 
-
             if not QueueItem.objects.filter(queue=queue, document=document).exists():
                 item = QueueItem.objects.create(
-                    queue=queue,
-                    document=document,
-                    position=ApprovalQueue.get_next_position(queue)
+                    queue=queue, document=document, position=ApprovalQueue.get_next_position(queue)
                 )
                 print(f"✅ Документ {document.id} добавлен в очередь: {item.id}")
                 return True
 
-            print(f"Очередь ID: {active_queue.pk}")
-            print(f"Документов в очереди до включения в очередь: {active_queue.items.count()}")
+            print(f"Очередь ID: {queue.pk}")
+            print(f"Документов в очереди до включения в очередь: {queue.items.count()}")
 
-            position = active_queue.items.count().get_next_position()
+            position = queue.items.count().get_next_position()
             print(f"Следующая позиция: {position}")
 
-            queue_item = QueueItem.objects.create(queue=active_queue, document=document, position=position)
+            queue_item = QueueItem.objects.create(queue=queue, document=document, position=position)
             print(f"Создан элемент QueueItem: {queue_item.id}")
-            print(f"Документов в очереди после включения в очередь: {active_queue.items.count()}")
+            print(f"Документов в очереди после включения в очередь: {queue.items.count()}")
 
             return True
 
@@ -457,25 +435,19 @@ class QueueService:
         print(f"Попытка определить для документа {document.title} подходящую очередь")
 
         if not document.assigned_admin:
-            print(f"Администратор: None - документ не будет добавлен в очередь")
+            print("Администратор: None - документ не будет добавлен в очередь")
             return None
 
         print(f"Администратор: {document.assigned_admin.email}")
 
         try:
-            active_queues = ApprovalQueue.objects.filter(
-                approver=document.assigned_admin,
-                is_stop=False
-            ).annotate(
+            active_queues = ApprovalQueue.objects.filter(approver=document.assigned_admin, is_stop=False).annotate(
                 items_count=Count("items")
             )
 
             if not active_queues.exists():
                 # Создаем новую очередь если нет активных
-                queue = ApprovalQueue.objects.create(
-                    approver=document.assigned_admin,
-                    is_stop=False
-                )
+                queue = ApprovalQueue.objects.create(approver=document.assigned_admin, is_stop=False)
                 print(f"Создан новая очередь: {queue.id}")
 
             elif active_queues.count() == 1:
@@ -485,14 +457,13 @@ class QueueService:
                 queue = active_queues.order_by("items_count").first()
 
             print(f"Выбрана очередь {queue.id} с {queue.items_count} документами")
-            print(f"Документов в очереди после включения в очередь: {active_queue.items.count()}")
+            print(f"Документов в очереди после включения в очередь: {queue.items.count()}")
 
             return queue
 
         except Exception as e:
             print(f"Ошибка добавления документа в очередь: {e}")
             return None
-
 
     @staticmethod
     def get_or_create_queue(admin):
@@ -512,7 +483,7 @@ class QueueService:
         from .models import QueueItem
 
         try:
-            items = QueueItem.objects.filter(queue=queue).order_by('position')
+            items = QueueItem.objects.filter(queue=queue).order_by("position")
             print(f"Реорганизация очереди {queue}, элементов: {items.count()}")
             for index, item in enumerate(items, start=1):
                 if item.position != index:
@@ -582,5 +553,3 @@ def setup_task_archive_old_documents(document_id):
 
         else:
             print("ℹ️ Задача архивации уже существует")
-
-

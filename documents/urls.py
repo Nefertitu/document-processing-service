@@ -2,7 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .apps import DocumentsConfig
-from .views import ApprovalQueueViewSet, DocumentViewSet, FolderViewSet, QueueItemViewSet, DocumentFileViewSet
+from .views import ApprovalQueueViewSet, DocumentFileViewSet, DocumentViewSet, FolderViewSet, QueueItemViewSet
 
 app_name = DocumentsConfig.name
 

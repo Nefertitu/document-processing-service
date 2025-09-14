@@ -10,7 +10,7 @@ from rest_framework.exceptions import ValidationError
 class DocumentFileValidator:
     """Класс-валидатор для проверки поля 'file' экземпляра 'Document'"""
 
-    def __init__(self, max_size=4*1024*1024) -> None:
+    def __init__(self, max_size=4 * 1024 * 1024) -> None:
         """Класс-валидатор работает с фиксированными полями"""
         self.max_size = max_size
 
@@ -88,11 +88,7 @@ class TitleValidator:
                 "цифр, пробелов, дефисов (-) и подчеркиваний (_)!"
             )
         if len(title_data) < 3:
-            raise serializers.ValidationError(
-                "Название должно содержать минимум 3 символа!"
-            )
+            raise serializers.ValidationError("Название должно содержать минимум 3 символа!")
         if not any(char.isalpha() for char in title_data):
-            raise serializers.ValidationError(
-                "Название должно содержать хотя бы одну букву!"
-            )
+            raise serializers.ValidationError("Название должно содержать хотя бы одну букву!")
         print("✅ Validation passed")

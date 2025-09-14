@@ -16,6 +16,7 @@ class QueueItemPaginator(PageNumberPagination):
     page_size_query_param = "page_size"
     max_page_size = 10
 
+
 class ApprovalItemPaginator(PageNumberPagination):
     """Пагинатор для вывода очередей с документами"""
 

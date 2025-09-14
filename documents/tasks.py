@@ -6,8 +6,8 @@ from celery import shared_task
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.mail import send_mail
-from django.utils import timezone
 from django.db.models import Q
+from django.utils import timezone
 from PIL import Image
 
 from config import settings
@@ -106,10 +106,11 @@ def optimize_image_task(document_file_id):
         print(f"🔄 Начинаем оптимизацию файла ID: {document_file_id}")
         print(
             f"📊 Статистика: документ {document_file.document.id} "
-            f"имеет {document_file.document.additional_files.count()} файлов")
+            f"имеет {document_file.document.additional_files.count()} файлов"
+        )
 
         if not document_file.file:
-            print(f"❌ У файла нет содержимого")
+            print("❌ У файла нет содержимого")
             return
 
         print("Найдены файлы оптимизации")
@@ -117,24 +118,20 @@ def optimize_image_task(document_file_id):
         original_filename = os.path.basename(document_file.file.name)
         print(f"🔄 Оптимизация файла: {original_filename} (ID: {document_file_id})")
 
-        print(f"⚙️ Вызов DocumentHeavyProcessingService.optimize_image")
+        print("⚙️ Вызов DocumentHeavyProcessingService.optimize_image")
         optimized_image = DocumentHeavyProcessingService.optimize_image(document_file.file)
 
         if optimized_image:
-            print(f"💾 Сохранение оптимизированного файла")
-            document_file.file.save(
-                original_filename,
-                optimized_image,
-                save=True
-            )
+            print("💾 Сохранение оптимизированного файла")
+            document_file.file.save(original_filename, optimized_image, save=True)
             print(f"✅ Файл {original_filename} оптимизирован и сохранен")
             return "success"
         else:
             print(f"⚠️ Не удалось оптимизировать файл {original_filename}")
             return "skipped"
 
-    except Document.DoesNotExist:
-        print(f"❌ Файл документа {document_id} не найден")
+    except DocumentFile.DoesNotExist:
+        print(f"❌ Файл документа {document_file_id} не найден")
     except Exception as e:
         print(f"❌ Ошибка обработки: {e}")
 
@@ -150,9 +147,6 @@ def archive_old_documents():
 
     from .models import Document
     from .services import FolderService
-    from django.utils import timezone
-    from datetime import timedelta
-    from django.db.models import Q
 
     try:
         archive_date = timezone.localtime() - timedelta(minutes=5)
@@ -162,9 +156,9 @@ def archive_old_documents():
         print(f"Дата архивации по времени 'since created_at': {archive_date_created}")
 
         old_documents = Document.objects.filter(
-            Q(reviewed_at__lte=archive_date, status__in=["approved", "rejected"]) |
-            Q(uploaded_at__lte=archive_date_created, status__in=["approved", "rejected"])
-            ).exclude(status="archived")
+            Q(reviewed_at__lte=archive_date, status__in=["approved", "rejected"])
+            | Q(uploaded_at__lte=archive_date_created, status__in=["approved", "rejected"])
+        ).exclude(status="archived")
 
         print(f"Найдено документов для архивации: {old_documents.count()}")
 
@@ -192,4 +186,3 @@ def archive_old_documents():
     except Exception as e:
         print(f"✗ Ошибка переноса документов в архив: {e}")
         return 0
-

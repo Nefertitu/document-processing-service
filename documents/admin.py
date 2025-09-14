@@ -1,17 +1,18 @@
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
-from django.db.models import QuerySet, Count, Q, Case, When, IntegerField
+from django.db.models import Case, Count, IntegerField, Q, QuerySet, When
 from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.safestring import mark_safe
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
-from .models import ApprovalQueue, Document, Folder, QueueItem, DocumentFile
-from .services import QueueService, DocumentService, get_next_available_admin
+from documents.utils.file_display import get_file_answer_display, get_files_display_html
+
+from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
+from .services import DocumentService, QueueService, get_next_available_admin
 from .tasks import send_single_document_email
-from documents.utils.file_display import get_files_display_html, get_file_answer_display
 
 
 class DocumentFileInline(admin.TabularInline):
@@ -36,16 +37,19 @@ class DocumentInline(admin.TabularInline):
     ]
     can_delete = False
     fieldsets = (
-        (None, {
-            'fields': (
-                "id",
-                # "title",
-                "title_link",
-                "status",
-                "assigned_admin",
-                "reviewed_at",
-            )
-        }),
+        (
+            None,
+            {
+                "fields": (
+                    "id",
+                    # "title",
+                    "title_link",
+                    "status",
+                    "assigned_admin",
+                    "reviewed_at",
+                )
+            },
+        ),
     )
 
     def get_queryset(self, request):
@@ -64,12 +68,8 @@ class DocumentInline(admin.TabularInline):
         """Создает кликабельную ссылку на документ"""
 
         if obj and obj.id:
-            url = reverse('admin:documents_document_change', args=[obj.id])
-            return format_html(
-                '<a href="{}" style="font-weight: bold;">{}</a>',
-                url,
-                obj.title
-            )
+            url = reverse("admin:documents_document_change", args=[obj.id])
+            return format_html('<a href="{}" style="font-weight: bold;">{}</a>', url, obj.title)
         return obj.title if obj else ""
 
     title_link.short_description = "Наименование документа"
@@ -106,9 +106,7 @@ class FolderAdmin(admin.ModelAdmin):
         "documents_count",
     )
 
-    list_filter = (
-        "title",
-    )
+    list_filter = ("title",)
     search_fields = (
         "title",
         "created_at",
@@ -130,9 +128,7 @@ class FolderAdmin(admin.ModelAdmin):
                 else:
                     filter_condition = Q(documents__status=status) & Q(documents__assigned_admin=request.user)
 
-                queryset = queryset.annotate(
-                    **{f"{status}_count": Count("documents", filter=filter_condition)}
-                )
+                queryset = queryset.annotate(**{f"{status}_count": Count("documents", filter=filter_condition)})
 
         return queryset
 
@@ -181,9 +177,7 @@ class DocumentAdmin(admin.ModelAdmin):
         # "file_answer",
     )
 
-    list_filter = (
-        "status",
-    )
+    list_filter = ("status",)
     search_fields = (
         "title",
         "owner",
@@ -267,9 +261,7 @@ class DocumentAdmin(admin.ModelAdmin):
 
         if not request.user.is_superuser:
             self.message_user(
-                request,
-                "❌ Только суперпользователь может менять администратора документов",
-                messages.ERROR
+                request, "❌ Только суперпользователь может менять администратора документов", messages.ERROR
             )
             return
 
@@ -383,7 +375,6 @@ class QueueItemInline(admin.TabularInline):
 
     get_title.short_description = "Наименование документа"
 
-
     def get_all_files_links(self, obj):
         """Отображает все файлы документа в очереди"""
 
@@ -421,7 +412,6 @@ class QueueItemInline(admin.TabularInline):
                     💾 Сохранить в документ
                 </button>
                 <div style="display: flex; gap: 10px;">
-                    
                     </a>
                 </div>
             </div>
@@ -436,8 +426,13 @@ class QueueItemInline(admin.TabularInline):
     def get_readonly_fields(self, request, obj=None):
         """Определяем какие поля доступны для редактирования"""
         base_readonly = [
-            "id", "position", "get_status", "get_title",
-            "added_at", "get_all_files_links", "document_actions"
+            "id",
+            "position",
+            "get_status",
+            "get_title",
+            "added_at",
+            "get_all_files_links",
+            "document_actions",
         ]
 
         if request.user.is_superuser or request.user.has_perm("documents.view_all_documents"):
@@ -472,12 +467,9 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         "status_approval",
         "approver",
         "created_at",
-
     )
 
-    list_filter = (
-        "approver",
-    )
+    list_filter = ("approver",)
     search_fields = (
         "approver__full_name",
         "title",
@@ -541,16 +533,11 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         """Статус с текстом и иконкой"""
 
         if obj.is_stop:
-            return format_html(
-                "<span style='color: red; font-size: 12px;'>❌</span>"
-            )
+            return format_html("<span style='color: red; font-size: 12px;'>❌</span>")
         else:
-            return format_html(
-                "<span style='color: green; font-size: 12px;'>✅</span>"
-            )
+            return format_html("<span style='color: green; font-size: 12px;'>✅</span>")
 
     status_approval.short_description = "Действующая очередь"
-
 
     def approve_document(self, request, object_id, item_id):
         """Одобрение документа из админки"""
@@ -606,12 +593,12 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
                 # ОТЛАДКА: выведем все ключи
                 print("Все ключи POST:")
                 for key in request.POST:
-                    if 'temp_' in key:
+                    if "temp_" in key:
                         print(f"  {key} = {request.POST[key]}")
 
                 print("Все ключи FILES:")
                 for key in request.FILES:
-                    if 'temp_' in key:
+                    if "temp_" in key:
                         print(f"  {key} = {request.FILES[key].name}")
 
                 temp_comment = None
@@ -627,9 +614,9 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
 
                 # Ищем файл в FILES
                 for i in range(10):  # Проверяем первые 10 индексов
-                    comment_key = f'items-{i}-temp_review_comment'
-                    file_key = f'items-{i}-temp_file_answer'
-                    id_key = f'items-{i}-id'
+                    comment_key = f"items-{i}-temp_review_comment"
+                    file_key = f"items-{i}-temp_file_answer"
+                    id_key = f"items-{i}-id"
 
                     # Проверяем что это наш элемент
                     if id_key in request.POST and request.POST[id_key] == str(queue_item_id):
@@ -657,7 +644,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
                         print(f"Загружен файл: {temp_file.name}")
 
                     document.save()
-                    print(f"Проверка после сохранения:")
+                    print("Проверка после сохранения:")
                     print(f"Комментарий документа: '{document.review_comment}'")
                     print(f"Файл документа: {document.file_answer}")
                     print(f"Файл существует: {document.file_answer.name if document.file_answer else 'No'}")
@@ -671,7 +658,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
                 print(f"QueueItem {queue_item_id} not found")
                 messages.error(request, f"Элемент очереди с ID {queue_item_id} не найден")
 
-        if applied:   # Остаемся на странице
+        if applied:  # Остаемся на странице
             return None
 
     def response_change(self, request, obj):
@@ -680,6 +667,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         if "apply" in request.POST:
 
             from django.http import HttpResponseRedirect
+
             return HttpResponseRedirect(request.path)
 
         return super().response_change(request, obj)
@@ -753,7 +741,6 @@ class QueueItemAdmin(admin.ModelAdmin):
     #     return obj.document.file if obj.document else None
     #
     # document_file.short_description = "Файл на согласование"
-
 
     def has_add_permission(self, request):
         """Запрещаем добавлять элементы вручную"""

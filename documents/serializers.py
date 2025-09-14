@@ -10,7 +10,7 @@ from rest_framework.validators import UniqueValidator
 
 from users.models import User
 
-from .models import ApprovalQueue, Document, Folder, QueueItem, DocumentFile
+from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
 from .validators import DocumentFileValidator, TitleValidator
 
 
@@ -88,7 +88,6 @@ class BaseDocumentSerializer(serializers.ModelSerializer):
     owner_info = serializers.SerializerMethodField()
     file_url = serializers.SerializerMethodField()
 
-
     def get_owner_info(self, obj):
         """Возвращает данные о создателе документа"""
 
@@ -154,41 +153,42 @@ class DocumentSerializer(BaseDocumentSerializer):
         allow_blank=True,
     )
     review_comment = serializers.CharField(
-        validators=[TitleValidator(field="description")],
-        required=False,
-        allow_blank=True,
-        read_only=True
+        validators=[TitleValidator(field="description")], required=False, allow_blank=True, read_only=True
     )
     assigned_admin_info = serializers.SerializerMethodField()
     reviewed_by_info = serializers.SerializerMethodField()
-    folder = serializers.SlugRelatedField(
-        slug_field="slug",
-        read_only=True
-    )
+    folder = serializers.SlugRelatedField(slug_field="slug", read_only=True)
 
     def get_assigned_admin_info(self, obj):
         """Добавляет информацию об ответственном администраторе"""
 
         if obj.assigned_admin:
-            return {
-                "email": obj.assigned_admin.email,
-                "full_name": obj.assigned_admin.get_full_name()
-            }
+            return {"email": obj.assigned_admin.email, "full_name": obj.assigned_admin.get_full_name()}
         return None
 
     def get_reviewed_by_info(self, obj):
         """Добавляет информацию о проверившем администраторе"""
 
         if obj.reviewed_by:
-            return {
-                "email": obj.reviewed_by.email,
-                "full_name": obj.reviewed_by.get_full_name()
-                }
+            return {"email": obj.reviewed_by.email, "full_name": obj.reviewed_by.get_full_name()}
         return None
 
     class Meta:
         model = Document
-        fields = ["id", "title", "description", "status", "owner_info", "assigned_admin_info", "uploaded_at", "file_url", "reviewed_by_info", "review_comment", "reviewed_at", "folder"]
+        fields = [
+            "id",
+            "title",
+            "description",
+            "status",
+            "owner_info",
+            "assigned_admin_info",
+            "uploaded_at",
+            "file_url",
+            "reviewed_by_info",
+            "review_comment",
+            "reviewed_at",
+            "folder",
+        ]
         read_only_fields = ["status", "uploaded_at", "owner_info", "assigned_admin_info", "reviewed_by_info", "folder"]
         validators = [TitleValidator(field="title")]
 
@@ -227,10 +227,26 @@ class DocumentAdminSerializer(BaseDocumentSerializer):
 
     class Meta:
         model = Document
-        fields = ["id", "title", "description", "assigned_admin_info", "owner_info", "file_url",
-                  "uploaded_at", "reviewed_at", "review_comment"]
-        read_only_fields = ["title", "description", "assigned_admin_info", "owner_info", "uploaded_at",
-                            "reviewed_at", "review_comment"]
+        fields = [
+            "id",
+            "title",
+            "description",
+            "assigned_admin_info",
+            "owner_info",
+            "file_url",
+            "uploaded_at",
+            "reviewed_at",
+            "review_comment",
+        ]
+        read_only_fields = [
+            "title",
+            "description",
+            "assigned_admin_info",
+            "owner_info",
+            "uploaded_at",
+            "reviewed_at",
+            "review_comment",
+        ]
 
 
 class ApprovalQueueSerializer(serializers.ModelSerializer):
@@ -273,11 +289,7 @@ class ApprovalQueueSerializer(serializers.ModelSerializer):
     def get_documents_in_queue(self, obj):
         """Возвращает список документов в очереди"""
 
-        request = self.context.get("request")
-
-        documents_in_queue = Document.objects.filter(
-            queue_items__queue_id=obj.pk
-        )
+        documents_in_queue = Document.objects.filter(queue_items__queue_id=obj.pk)
         for doc in documents_in_queue:
             # file_url = [file.file.url for file in DocumentFile.objects.filter(document=doc.pk)]
             # file_name = [file.file.original_name for file in DocumentFile.objects.filter(document=doc.pk)]
@@ -291,15 +303,15 @@ class ApprovalQueueSerializer(serializers.ModelSerializer):
                     "owner_email": doc.owner.email,
                     "owner_name": doc.owner.full_name,
                 },
-                "assigned_admin_info":{
+                "assigned_admin_info": {
                     "assigned_admin_email": doc.assigned_admin.email,
                     "assigned_admin_name": doc.assigned_admin.full_name,
                 },
                 "files": [file.file.url for file in DocumentFile.objects.filter(document=doc.pk)],
                 # {
-                    # "file_name": file_name,
-                    # "file_url": file_url,
-                    # },
+                # "file_name": file_name,
+                # "file_url": file_url,
+                # },
             }
             return data
 

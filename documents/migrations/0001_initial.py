@@ -51,7 +51,7 @@ class Migration(migrations.Migration):
                     "file",
                     models.FileField(
                         help_text="Введите название файла",
-                        upload_to='temp_uploads/%Y/%m/%d/',
+                        upload_to="temp_uploads/%Y/%m/%d/",
                         verbose_name="Расположение vs название файла",
                     ),
                 ),

@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import Count, Max, Min
 
 from config import settings
+
 from .services import DocumentFilePathGeneratorService, QueueService
 
 User = get_user_model()
@@ -52,8 +53,7 @@ class Folder(models.Model):
 
         for folder_data in system_folders:
             folder, created = cls.objects.get_or_create(
-                slug=folder_data["slug"],
-                defaults={"title": folder_data["title"]}
+                slug=folder_data["slug"], defaults={"title": folder_data["title"]}
             )
 
             if created:
@@ -129,7 +129,7 @@ class Document(models.Model):
         verbose_name="Проверивший администратор",
         null=True,
         blank=True,
-        related_name="reviewed_documents"
+        related_name="reviewed_documents",
     )
     file_answer = models.FileField(
         upload_to="documents.services.DocumentFilePathGeneratorService.admin_document_path",
@@ -158,10 +158,7 @@ class Document(models.Model):
         """Создание системных папок"""
 
         if not self.folder:
-            self.folder, created = Folder.objects.get_or_create(
-                slug="pending",
-                defaults={"title": "На рассмотрении"}
-            )
+            self.folder, created = Folder.objects.get_or_create(slug="pending", defaults={"title": "На рассмотрении"})
         super().save(*args, **kwargs)
 
     def assign_admin(self, admin=None):
@@ -210,7 +207,6 @@ class DocumentFile(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     original_name = models.CharField(max_length=255)
 
-
     def save(self, *args, **kwargs):
         """Определяет способ записи наименования файла"""
 
@@ -233,7 +229,6 @@ class ApprovalQueueManager(models.Manager):
 
     def reorganize(self, queue_id):
         """Импорт сервисного метода реорганизации очереди"""
-        from .services import QueueService
         return QueueService.reorganize_queue(queue_id)
 
 
@@ -292,7 +287,10 @@ class QueueItemManager(models.Manager):
 
     def create_with_position(self, **kwargs):
         """Создает элемент очереди с автоматическим определением позиции"""
-        from .services import QueueService
+
+        document = kwargs.get("document")
+        if not document:
+            raise ValueError("Документ не указан")
 
         queue = QueueService.find_suitable_queue_for_document(document)
         if not queue:
@@ -300,14 +298,11 @@ class QueueItemManager(models.Manager):
 
         position = queue.get_next_position()
 
+        item = self.create(queue=queue, document=document, position=position, **kwargs)
+
         print(f"✅ Документ {document.id} добавлен в очередь: {item.id}")
 
-        return self.create(
-            queue=queue,
-            document=document,
-            position=position,
-            **kwargs
-        )
+        return item
 
 
 class QueueItem(models.Model):
@@ -387,15 +382,14 @@ class QueueItem(models.Model):
         #     super().save(update_fields=["position"])
         #     print(f"QueueItem saved with ID: {self.id}, position: {self.position}")
 
-            # if not QueueItem.objects.filter(queue=queue, document=document).exists():
-            #     item = QueueItem.objects.create(
-            #         queue=queue,
-            #         document=document,
-            #         position=ApprovalQueue.get_next_position(queue)
-            #     )
-            #     print(f"✅ Документ {document.id} добавлен в очередь: {item.id}")
-            #     return True
-
+        # if not QueueItem.objects.filter(queue=queue, document=document).exists():
+        #     item = QueueItem.objects.create(
+        #         queue=queue,
+        #         document=document,
+        #         position=ApprovalQueue.get_next_position(queue)
+        #     )
+        #     print(f"✅ Документ {document.id} добавлен в очередь: {item.id}")
+        #     return True
 
     def delete(self, *args, **kwargs):
         """Переопределяем удаление для автоматической реорганизации очереди"""

@@ -1,5 +1,8 @@
 import os
 from datetime import datetime, time, timedelta
+from io import StringIO
+from unittest.mock import patch
+
 from django.contrib import admin, messages
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -9,20 +12,17 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 from django_celery_beat.models import PeriodicTask
-from io import StringIO
-from parameterized import parameterized
 from parameterized import parameterized
 from rest_framework import status
 from rest_framework.test import APITestCase
-from unittest.mock import patch
 
 from config import settings
 from users.models import User
 
-from .admin import DocumentAdmin, ApprovalQueueAdmin
-from .models import Document, Folder, ApprovalQueue, QueueItem, DocumentFile
-from .services import DocumentHeavyProcessingService, DocumentService,  setup_task_archive_old_documents
-from .tasks import send_single_document_email, optimize_image_task, archive_old_documents
+from .admin import ApprovalQueueAdmin, DocumentAdmin
+from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
+from .services import DocumentHeavyProcessingService, DocumentService, setup_task_archive_old_documents
+from .tasks import archive_old_documents, optimize_image_task, send_single_document_email
 
 
 class DocumentTestCase(APITestCase):
@@ -32,18 +32,14 @@ class DocumentTestCase(APITestCase):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
         self.superuser = User.objects.create(
             email="testsuperuser@example.com",
@@ -62,13 +58,13 @@ class DocumentTestCase(APITestCase):
         Folder.ensure_system_folders()
 
         self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",  # Бинарное содержимое файла
-            content_type="image/jpeg"
+            "test_image.jpg", b"file_content", content_type="image/jpeg"  # Бинарное содержимое файла
         )
 
         self.client.force_authenticate(user=self.user)
-        print(f"📄 Создан документ ID: {self.document.pk}, Title: {self.document.title}, Status: {self.document.status}")
+        print(
+            f"📄 Создан документ ID: {self.document.pk}, Title: {self.document.title}, Status: {self.document.status}"
+        )
 
     def test_document_retrieve(self) -> None:
         """Тест получения деталей документа"""
@@ -101,7 +97,7 @@ class DocumentTestCase(APITestCase):
             "title": "Test 2 from 2",
             "owner": self.user.pk,
             "assigned_admin": self.admin.pk,
-            "files": self.mock_file
+            "files": self.mock_file,
         }
 
         response = self.client.post(url, data, format="multipart")
@@ -173,8 +169,10 @@ class DocumentTestCase(APITestCase):
             ("криптовалюта", "Нельзя использовать запрещенные слова (криптовалюта) в названии и/или описании!"),
             ("123", "Название должно содержать хотя бы одну букву!"),
             ("VS", "Название должно содержать минимум 3 символа!"),
-            ("/*/",
-             "Название может состоять из русских и английских букв, цифр, пробелов, дефисов (-) и подчеркиваний (_)!")
+            (
+                "/*/",
+                "Название может состоять из русских и английских букв, цифр, пробелов, дефисов (-) и подчеркиваний (_)!",
+            ),
         ]
     )
     def test_documents_create_invalid_title(self, invalid_value, expected_error) -> None:
@@ -197,17 +195,13 @@ class DocumentTestCase(APITestCase):
 
         url = reverse("documents:document-list")
 
-        large_file = SimpleUploadedFile(
-            "large_image.jpg",
-            b"0" * (5 * 1024 * 1024),
-            content_type="image/jpeg"
-        )
+        large_file = SimpleUploadedFile("large_image.jpg", b"0" * (5 * 1024 * 1024), content_type="image/jpeg")
 
         data = {
             "title": "New Document with large file",
             "files": large_file,
             "owner": self.user.pk,
-            "assigned_admin": self.admin.id
+            "assigned_admin": self.admin.id,
         }
 
         response = self.client.post(url, data, format="multipart")
@@ -230,18 +224,14 @@ class ApprovalQueueTestCase(APITestCase):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
         self.superuser = User.objects.create(
             email="testsuperuser@example.com",
@@ -258,9 +248,7 @@ class ApprovalQueueTestCase(APITestCase):
         content_type = ContentType.objects.get_for_model(ApprovalQueue)
 
         approve_perm, created = Permission.objects.get_or_create(
-            codename="can_approve_document",
-            content_type=content_type,
-            defaults={"name": "Can approve document"}
+            codename="can_approve_document", content_type=content_type, defaults={"name": "Can approve document"}
         )
 
         # Назначаем права пользователю
@@ -286,9 +274,7 @@ class ApprovalQueueTestCase(APITestCase):
         Folder.ensure_system_folders()
 
         self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",  # Бинарное содержимое файла
-            content_type="image/jpeg"
+            "test_image.jpg", b"file_content", content_type="image/jpeg"  # Бинарное содержимое файла
         )
         self.document_file = DocumentFile.objects.create(
             document=self.document,
@@ -335,7 +321,7 @@ class ApprovalQueueTestCase(APITestCase):
             "title": "Test document for approval queue test",
             "owner": self.user.pk,
             "assigned_admin": self.admin.pk,
-            "files": self.mock_file
+            "files": self.mock_file,
         }
 
         response = self.client.post(url, data, format="multipart")
@@ -364,7 +350,6 @@ class ApprovalQueueTestCase(APITestCase):
         document_id = self.document_file.document.pk
         queue_item_id = QueueItem.objects.get(document=document_id).pk
         approval_queue_items = self.approvalqueue.items.all()
-        count_approval_queue_items = approval_queue_items.count()
         approval_queue_item_id = [approval_queue_item.pk for approval_queue_item in approval_queue_items][0]
         self.assertEqual(queue_item_id, approval_queue_item_id)
 
@@ -410,7 +395,6 @@ class ApprovalQueueTestCase(APITestCase):
         document_id = self.document_file.document.pk
         queue_item_id = QueueItem.objects.get(document=document_id).pk
         approval_queue_items = self.approvalqueue.items.all()
-        count_approval_queue_items = approval_queue_items.count()
         approval_queue_item_id = [approval_queue_item.pk for approval_queue_item in approval_queue_items][0]
         self.assertEqual(queue_item_id, approval_queue_item_id)
 
@@ -440,18 +424,14 @@ class QueueItemTestCase(APITestCase):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
 
         from django.contrib.auth.models import Permission
@@ -460,19 +440,13 @@ class QueueItemTestCase(APITestCase):
         content_type = ContentType.objects.get_for_model(QueueItem)
 
         approve_perm, created = Permission.objects.get_or_create(
-            codename="can_approve_document",
-            content_type=content_type,
-            defaults={"name": "Can approve document"}
+            codename="can_approve_document", content_type=content_type, defaults={"name": "Can approve document"}
         )
         reject_perm, created = Permission.objects.get_or_create(
-            codename="can_reject_document",
-            content_type=content_type,
-            defaults={"name": "Can reject document"}
+            codename="can_reject_document", content_type=content_type, defaults={"name": "Can reject document"}
         )
         view_all_perm, created = Permission.objects.get_or_create(
-            codename="view_all_documents",
-            content_type=content_type,
-            defaults={"name": "Can view all documents"}
+            codename="view_all_documents", content_type=content_type, defaults={"name": "Can view all documents"}
         )
 
         # Назначаем права пользователю
@@ -484,10 +458,7 @@ class QueueItemTestCase(APITestCase):
             assigned_admin=self.admin,
             title="Test document",
         )
-        self.approvalqueue = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin
-        )
+        self.approvalqueue = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin)
         self.queue_item = QueueItem.objects.create(
             queue=self.approvalqueue,
             document=self.document,
@@ -498,14 +469,13 @@ class QueueItemTestCase(APITestCase):
         Folder.ensure_system_folders()
 
         self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",  # Бинарное содержимое файла
-            content_type="image/jpeg"
+            "test_image.jpg", b"file_content", content_type="image/jpeg"  # Бинарное содержимое файла
         )
 
         self.client.force_authenticate(user=self.user)
         print(
-            f"📄 Создан документ ID: {self.document.pk}, Очередь: {self.approvalqueue.approver}, QueueItem: {self.queue_item.position}")
+            f"📄 Создан документ ID: {self.document.pk}, Очередь: {self.approvalqueue.approver}, QueueItem: {self.queue_item.position}"
+        )
 
     def test_queue_item_retrieve(self) -> None:
         """Тест получения деталей элемента очереди"""
@@ -533,7 +503,7 @@ class QueueItemTestCase(APITestCase):
             "title": "Test document for queue_item test",
             "owner": self.user.pk,
             "assigned_admin": self.admin.pk,
-            "files": self.mock_file
+            "files": self.mock_file,
         }
         print(f"📋 Request data keys: {list(data.keys())}")
         print(f"📋 File type: {type(self.mock_file)}")
@@ -662,18 +632,14 @@ class DocumentFileTestCase(APITestCase):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
         self.superuser = User.objects.create(
             email="testsuperuser@example.com",
@@ -683,21 +649,14 @@ class DocumentFileTestCase(APITestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",
-            content_type="image/jpeg"
-        )
+        self.mock_file = SimpleUploadedFile("test_image.jpg", b"file_content", content_type="image/jpeg")
         self.document = Document.objects.create(
             owner=self.user,
             assigned_admin=self.admin,
             title="Test document with file",
         )
         self.document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.mock_file,
-            owner=self.user,
-            original_name="test_image.jpg"
+            document=self.document, file=self.mock_file, owner=self.user, original_name="test_image.jpg"
         )
 
         Folder.ensure_system_folders()
@@ -738,11 +697,7 @@ class DocumentFileTestCase(APITestCase):
 
         url = reverse("documents:document-list")
 
-        data = {
-            "title": "New Document with File",
-            "files": self.mock_file,
-            "assigned_admin": self.admin.id
-        }
+        data = {"title": "New Document with File", "files": self.mock_file, "assigned_admin": self.admin.id}
 
         response = self.client.post(url, data, format="multipart")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -794,18 +749,14 @@ class SendInformationTaskTest(APITestCase):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
         self.superuser = User.objects.create(
             email="testsuperuser@example.com",
@@ -815,16 +766,8 @@ class SendInformationTaskTest(APITestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",
-            content_type="image/jpeg"
-        )
-        self.large_file = SimpleUploadedFile(
-            "large_image.jpg",
-            b"0" * (5 * 1024 * 1024),
-            content_type="image/jpeg"
-        )
+        self.mock_file = SimpleUploadedFile("test_image.jpg", b"file_content", content_type="image/jpeg")
+        self.large_file = SimpleUploadedFile("large_image.jpg", b"0" * (5 * 1024 * 1024), content_type="image/jpeg")
         self.document = Document.objects.create(
             owner=self.user,
             assigned_admin=self.admin,
@@ -832,10 +775,7 @@ class SendInformationTaskTest(APITestCase):
             # files=self.large_file,
         )
         self.document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.large_file,
-            owner=self.user,
-            original_name="test_large_image.jpg"
+            document=self.document, file=self.large_file, owner=self.user, original_name="test_large_image.jpg"
         )
 
         Folder.ensure_system_folders()
@@ -849,11 +789,7 @@ class SendInformationTaskTest(APITestCase):
         документа на согласование на 'email' админу
         """
 
-        send_single_document_email(
-            document_id=self.document.pk,
-            status=self.document.status,
-            comment=""
-        )
+        send_single_document_email(document_id=self.document.pk, status=self.document.status, comment="")
 
         mock_send_mail.assert_called_once_with(
             subject="Получен документ на согласование",
@@ -882,11 +818,7 @@ class SendInformationTaskTest(APITestCase):
         документом статуса одобренного на 'email' пользователю
         """
 
-        send_single_document_email(
-            document_id=self.document.pk,
-            status="approved",
-            comment=""
-        )
+        send_single_document_email(document_id=self.document.pk, status="approved", comment="")
 
         mock_send_mail.assert_called_once_with(
             subject="✅ Ваш документ подтвержден!",
@@ -912,11 +844,7 @@ class SendInformationTaskTest(APITestCase):
         документом статуса одобренного на 'email' пользователю
         """
 
-        send_single_document_email(
-            document_id=self.document.pk,
-            status="rejected",
-            comment=""
-        )
+        send_single_document_email(document_id=self.document.pk, status="rejected", comment="")
 
         mock_send_mail.assert_called_once_with(
             subject="❌ Ваш документ отклонен!",
@@ -973,43 +901,29 @@ class DocumentHeavyProcessingServiceTest(APITestCase):
         """Подготовка данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
-        self.large_file = SimpleUploadedFile(
-            "large_image.jpg",
-            b"0" * (3 * 1024 * 1024),
-            content_type="image/jpeg"
-        )
+        self.large_file = SimpleUploadedFile("large_image.jpg", b"0" * (3 * 1024 * 1024), content_type="image/jpeg")
         self.document = Document.objects.create(
             owner=self.user,
             assigned_admin=self.admin,
             title="Test document with file",
             # files=self.large_file,
         )
-        self.document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.large_file,
-            owner=self.user
-        )
+        self.document_file = DocumentFile.objects.create(document=self.document, file=self.large_file, owner=self.user)
 
     @patch("documents.services.DocumentHeavyProcessingService.optimize_image")
     def test_optimize_image_success(self, mock_optimize_image):
         """Тест, подтверждающий, что метод оптимизации ВЫЗЫВАЕТСЯ когда нужно"""
 
-        DocumentHeavyProcessingService.optimize_image(
-            self.document_file.file
-        )
+        DocumentHeavyProcessingService.optimize_image(self.document_file.file)
 
         mock_optimize_image.assert_called_once_with(self.document_file.file)
 
@@ -1019,7 +933,7 @@ class DocumentHeavyProcessingServiceTest(APITestCase):
         test_image = SimpleUploadedFile(
             "test_large.jpg",
             DocumentHeavyProcessingService.generate_test_image_content(width=2000, height=2000),  # Большое изображение
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         original_size = test_image.size
@@ -1034,9 +948,9 @@ class DocumentHeavyProcessingServiceTest(APITestCase):
         print(f"📊 Optimized size: {result.getbuffer().nbytes} bytes")
         print(f"📉 Size reduction: {((original_size - result.getbuffer().nbytes) / original_size * 100):.1f}%")
 
-        small_image = SimpleUploadedFile("small.jpg",
-                                         DocumentHeavyProcessingService.generate_test_image_content(100, 100),
-                                         "image/jpeg")
+        small_image = SimpleUploadedFile(
+            "small.jpg", DocumentHeavyProcessingService.generate_test_image_content(100, 100), "image/jpeg"
+        )
         result = DocumentHeavyProcessingService.optimize_image(small_image)
         self.assertIsNone(result)
 
@@ -1048,18 +962,14 @@ class ArchiveOldDocumentTaskTest(APITestCase):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
 
         from django.contrib.auth.models import Permission
@@ -1068,14 +978,10 @@ class ArchiveOldDocumentTaskTest(APITestCase):
         content_type = ContentType.objects.get_for_model(QueueItem)
 
         approve_perm, created = Permission.objects.get_or_create(
-            codename="can_approve_document",
-            content_type=content_type,
-            defaults={"name": "Can approve document"}
+            codename="can_approve_document", content_type=content_type, defaults={"name": "Can approve document"}
         )
         reject_perm, created = Permission.objects.get_or_create(
-            codename="can_reject_document",
-            content_type=content_type,
-            defaults={"name": "Can reject document"}
+            codename="can_reject_document", content_type=content_type, defaults={"name": "Can reject document"}
         )
 
         self.admin.user_permissions.add(approve_perm, reject_perm)
@@ -1089,16 +995,8 @@ class ArchiveOldDocumentTaskTest(APITestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",
-            content_type="image/jpeg"
-        )
-        self.large_file = SimpleUploadedFile(
-            "large_image.jpg",
-            b"0" * (5 * 1024 * 1024),
-            content_type="image/jpeg"
-        )
+        self.mock_file = SimpleUploadedFile("test_image.jpg", b"file_content", content_type="image/jpeg")
+        self.large_file = SimpleUploadedFile("large_image.jpg", b"0" * (5 * 1024 * 1024), content_type="image/jpeg")
         self.document = Document.objects.create(
             owner=self.user,
             assigned_admin=self.admin,
@@ -1106,15 +1004,9 @@ class ArchiveOldDocumentTaskTest(APITestCase):
             # files=self.large_file,
         )
         self.document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.large_file,
-            owner=self.user,
-            original_name="test_large_image.jpg"
+            document=self.document, file=self.large_file, owner=self.user, original_name="test_large_image.jpg"
         )
-        self.approvalqueue = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin
-        )
+        self.approvalqueue = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin)
         self.queue_item = QueueItem.objects.create(
             queue=self.approvalqueue,
             document=self.document,
@@ -1125,8 +1017,8 @@ class ArchiveOldDocumentTaskTest(APITestCase):
 
         self.client.force_authenticate(user=self.user)
 
-    @patch('documents.tasks.archive_old_documents.delay')
-    @patch('documents.tasks.timezone')
+    @patch("documents.tasks.archive_old_documents.delay")
+    @patch("documents.tasks.timezone")
     def test_approve_document_triggers_archive_task(self, mock_timezone, mock_archive_task):
         """Тест, что одобрение документа запускает задачу архивации"""
         self.client.force_authenticate(user=self.admin)
@@ -1149,13 +1041,13 @@ class ArchiveOldDocumentTaskTest(APITestCase):
                 title=f"Old Doc {i}",
                 owner=self.user,
                 status="approved",
-                reviewed_at=timezone.now() - timedelta(hours=2)
+                reviewed_at=timezone.now() - timedelta(hours=2),
             )
 
         result = archive_old_documents()
         self.assertEqual(result, 3)
 
-    @patch('documents.tasks.timezone')
+    @patch("documents.tasks.timezone")
     def test_task_archive_old_documents_delay_called(self, mock_timezone):
         """Тест успешного вызова задачи по переносу файлов в архив"""
 
@@ -1168,7 +1060,7 @@ class ArchiveOldDocumentTaskTest(APITestCase):
             assigned_admin=self.admin,
             reviewed_at=timezone.now() - timedelta(minutes=10),
             uploaded_at=timezone.now() - timedelta(hours=2),
-            reviewed_by=self.admin
+            reviewed_by=self.admin,
         )
 
         archive_documents = Document.objects.filter(status="archived").count()
@@ -1178,6 +1070,7 @@ class ArchiveOldDocumentTaskTest(APITestCase):
         mock_timezone.localtime.return_value = mock_now
 
         from documents.tasks import archive_old_documents
+
         archive_old_documents()  # Без .delay()!
 
         archive_documents_now = Document.objects.filter(status="archived").count()
@@ -1189,31 +1082,27 @@ class ArchiveOldDocumentTaskTest(APITestCase):
 
 
 class DocumentServiceTest(APITestCase):
-    """"Тест кейс для проверки работы сервиса документов"""
+    """ "Тест кейс для проверки работы сервиса документов"""
 
     def setUp(self):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
         self.admin_2 = User.objects.create(
             email="test2adminuser@example.com",
             password="testpass123",
             first_name="Admin2",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
 
         from django.contrib.auth.models import Permission
@@ -1222,14 +1111,10 @@ class DocumentServiceTest(APITestCase):
         content_type = ContentType.objects.get_for_model(QueueItem)
 
         approve_perm, created = Permission.objects.get_or_create(
-            codename="can_approve_document",
-            content_type=content_type,
-            defaults={"name": "Can approve document"}
+            codename="can_approve_document", content_type=content_type, defaults={"name": "Can approve document"}
         )
         reject_perm, created = Permission.objects.get_or_create(
-            codename="can_reject_document",
-            content_type=content_type,
-            defaults={"name": "Can reject document"}
+            codename="can_reject_document", content_type=content_type, defaults={"name": "Can reject document"}
         )
 
         self.admin.user_permissions.add(approve_perm, reject_perm)
@@ -1243,11 +1128,7 @@ class DocumentServiceTest(APITestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",
-            content_type="image/jpeg"
-        )
+        self.mock_file = SimpleUploadedFile("test_image.jpg", b"file_content", content_type="image/jpeg")
         self.document = Document.objects.create(
             owner=self.user,
             assigned_admin=self.admin,
@@ -1261,23 +1142,11 @@ class DocumentServiceTest(APITestCase):
             # files=self.large_file,
         )
         self.document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.mock_file,
-            owner=self.user,
-            original_name="test_large_image.jpg"
+            document=self.document, file=self.mock_file, owner=self.user, original_name="test_large_image.jpg"
         )
-        self.approvalqueue = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin
-        )
-        self.approvalqueue_2 = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin_2
-        )
-        self.approvalqueue_3 = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin_2
-        )
+        self.approvalqueue = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin)
+        self.approvalqueue_2 = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin_2)
+        self.approvalqueue_3 = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin_2)
         self.queue_item = QueueItem.objects.create(
             queue=self.approvalqueue,
             document=self.document,
@@ -1301,8 +1170,6 @@ class DocumentServiceTest(APITestCase):
 
         self.client.force_authenticate(user=self.user)
 
-        from .services import DocumentService
-
         document_data = {
             "title": "Test document service invalid",
             "owner": self.user.pk,
@@ -1317,17 +1184,11 @@ class DocumentServiceTest(APITestCase):
     def test_create_document_service(self):
         """Тест работы сервиса создания документа"""
 
-        from .services import DocumentService
-
         document_data = {
             "title": "Test document service invalid",
             "assigned_admin": self.admin,
         }
-        mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",
-            content_type="image/jpeg"
-        )
+        mock_file = SimpleUploadedFile("test_image.jpg", b"file_content", content_type="image/jpeg")
 
         document = DocumentService.create_document(document_data, self.user, [mock_file])
 
@@ -1351,7 +1212,9 @@ class DocumentServiceTest(APITestCase):
         available_admin = get_next_available_admin(exclude_admin=self.document.assigned_admin)
         print(f"available_admin: {available_admin}")
 
-        active_admins = User.objects.filter(is_staff=True, is_superuser=False, approval_queue__is_stop=False).distinct()
+        active_admins = User.objects.filter(
+            is_staff=True, is_superuser=False, approval_queue__is_stop=False
+        ).distinct()
         print(f"active_admins333: {[active_admin for active_admin in active_admins]}")
 
         all_queues = ApprovalQueue.objects.all()
@@ -1363,32 +1226,29 @@ class DocumentServiceTest(APITestCase):
 
                 self.assertEqual(available_admin.email, selected_admin)
 
+
 class DocumentAdminTest(APITestCase):
-    """"Тест кейс для проверки работы 'DocumentAdmin'"""
+    """ "Тест кейс для проверки работы 'DocumentAdmin'"""
 
     def setUp(self):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
         self.admin_2 = User.objects.create(
             email="test2adminuser@example.com",
             password="testpass123",
             first_name="Admin2",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
 
         from django.contrib.auth.models import Permission
@@ -1397,14 +1257,10 @@ class DocumentAdminTest(APITestCase):
         content_type = ContentType.objects.get_for_model(QueueItem)
 
         approve_perm, created = Permission.objects.get_or_create(
-            codename="can_approve_document",
-            content_type=content_type,
-            defaults={"name": "Can approve document"}
+            codename="can_approve_document", content_type=content_type, defaults={"name": "Can approve document"}
         )
         reject_perm, created = Permission.objects.get_or_create(
-            codename="can_reject_document",
-            content_type=content_type,
-            defaults={"name": "Can reject document"}
+            codename="can_reject_document", content_type=content_type, defaults={"name": "Can reject document"}
         )
 
         self.admin.user_permissions.add(approve_perm, reject_perm)
@@ -1418,11 +1274,7 @@ class DocumentAdminTest(APITestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",
-            content_type="image/jpeg"
-        )
+        self.mock_file = SimpleUploadedFile("test_image.jpg", b"file_content", content_type="image/jpeg")
         self.document = Document.objects.create(
             owner=self.user,
             assigned_admin=self.admin,
@@ -1436,23 +1288,11 @@ class DocumentAdminTest(APITestCase):
             # files=self.large_file,
         )
         self.document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.mock_file,
-            owner=self.user,
-            original_name="test_large_image.jpg"
+            document=self.document, file=self.mock_file, owner=self.user, original_name="test_large_image.jpg"
         )
-        self.approvalqueue = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin
-        )
-        self.approvalqueue_2 = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin
-        )
-        self.approvalqueue_3 = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin_2
-        )
+        self.approvalqueue = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin)
+        self.approvalqueue_2 = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin)
+        self.approvalqueue_3 = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin_2)
         self.queue_item = QueueItem.objects.create(
             queue=self.approvalqueue,
             document=self.document,
@@ -1489,8 +1329,8 @@ class DocumentAdminTest(APITestCase):
         original_admin = self.document.assigned_admin
         print(f"original_admin555: {original_admin}")
 
-        with patch('documents.admin.DocumentAdmin.message_user'):
-            with patch('documents.admin.send_single_document_email.delay'):
+        with patch("documents.admin.DocumentAdmin.message_user"):
+            with patch("documents.admin.send_single_document_email.delay"):
                 document_admin.change_admin_action(request=request, queryset=documents)
 
                 self.document.refresh_from_db()
@@ -1499,24 +1339,20 @@ class DocumentAdminTest(APITestCase):
 
 
 class ApprovalQueueAdminTest(APITestCase):
-    """ """"Тест кейс для проверки работы 'ApprovalQueueAdmin'"""
+    """ """ "Тест кейс для проверки работы 'ApprovalQueueAdmin'" ""
 
     def setUp(self):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
 
         from django.contrib.auth.models import Permission
@@ -1525,14 +1361,10 @@ class ApprovalQueueAdminTest(APITestCase):
         content_type = ContentType.objects.get_for_model(QueueItem)
 
         approve_perm, created = Permission.objects.get_or_create(
-            codename="can_approve_document",
-            content_type=content_type,
-            defaults={"name": "Can approve document"}
+            codename="can_approve_document", content_type=content_type, defaults={"name": "Can approve document"}
         )
         reject_perm, created = Permission.objects.get_or_create(
-            codename="can_reject_document",
-            content_type=content_type,
-            defaults={"name": "Can reject document"}
+            codename="can_reject_document", content_type=content_type, defaults={"name": "Can reject document"}
         )
 
         self.admin.user_permissions.add(approve_perm, reject_perm)
@@ -1546,11 +1378,7 @@ class ApprovalQueueAdminTest(APITestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",
-            content_type="image/jpeg"
-        )
+        self.mock_file = SimpleUploadedFile("test_image.jpg", b"file_content", content_type="image/jpeg")
         self.document = Document.objects.create(
             owner=self.user,
             assigned_admin=self.admin,
@@ -1558,15 +1386,9 @@ class ApprovalQueueAdminTest(APITestCase):
             # files=self.large_file,
         )
         self.document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.mock_file,
-            owner=self.user,
-            original_name="test_large_image.jpg"
+            document=self.document, file=self.mock_file, owner=self.user, original_name="test_large_image.jpg"
         )
-        self.approvalqueue = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin
-        )
+        self.approvalqueue = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin)
         self.queue_item = QueueItem.objects.create(
             queue=self.approvalqueue,
             document=self.document,
@@ -1578,10 +1400,7 @@ class ApprovalQueueAdminTest(APITestCase):
     def test_approve_document(self):
         """Тест одобрения документа из админки"""
 
-        approval_admin = ApprovalQueueAdmin(
-            model=ApprovalQueue,
-            admin_site=admin.site
-        )
+        approval_admin = ApprovalQueueAdmin(model=ApprovalQueue, admin_site=admin.site)
         factory = RequestFactory()
         request = factory.get("/admin/")
         request.user = self.admin
@@ -1589,39 +1408,32 @@ class ApprovalQueueAdminTest(APITestCase):
 
         with patch("documents.admin.DocumentService.handle_queue_action") as mock_handle:
             with patch("documents.admin.Document.objects.get") as mock_get:
-                with patch('documents.admin.ApprovalQueueAdmin._handle_queueitem_action') as mock_handle_action:
+                with patch("documents.admin.ApprovalQueueAdmin._handle_queueitem_action") as mock_handle_action:
                     real_time = timezone.localtime()
 
                     mock_handle.return_value = {
                         "success": True,
                         "document_id": self.document.pk,
-                        "message": "Документ одобрен"
+                        "message": "Документ одобрен",
                     }
                     mock_get.return_value = self.document
 
                     with patch("documents.admin.timezone.localtime", return_value=real_time):
                         result = approval_admin.approve_document(
-                            request=request,
-                            object_id=self.approvalqueue.pk,
-                            item_id=self.queue_item.pk
+                            request=request, object_id=self.approvalqueue.pk, item_id=self.queue_item.pk
                         )
 
                         self.assertIsInstance(result, HttpResponseRedirect)
                         self.assertEqual(result.url, "/admin/")
 
-                        mock_handle.assert_called_with(
-                            self.queue_item.pk, self.admin, "approve"
-                        )
+                        mock_handle.assert_called_with(self.queue_item.pk, self.admin, "approve")
                         mock_get.assert_called_with(id=self.document.pk)
                         mock_handle_action.assert_called_with(request, mock_handle.return_value)
 
     def test_reject_document(self):
         """Тест отклонения документа из админки"""
 
-        approval_admin = ApprovalQueueAdmin(
-            model=ApprovalQueue,
-            admin_site=admin.site
-        )
+        approval_admin = ApprovalQueueAdmin(model=ApprovalQueue, admin_site=admin.site)
         factory = RequestFactory()
         request = factory.get("/admin/")
         request.user = self.admin
@@ -1629,29 +1441,25 @@ class ApprovalQueueAdminTest(APITestCase):
 
         with patch("documents.admin.DocumentService.handle_queue_action") as mock_handle:
             with patch("documents.admin.Document.objects.get") as mock_get:
-                with patch('documents.admin.ApprovalQueueAdmin._handle_queueitem_action') as mock_handle_action:
+                with patch("documents.admin.ApprovalQueueAdmin._handle_queueitem_action") as mock_handle_action:
                     real_time = timezone.localtime()
 
                     mock_handle.return_value = {
                         "success": True,
                         "document_id": self.document.pk,
-                        "message": "Документ отклонен!"
+                        "message": "Документ отклонен!",
                     }
                     mock_get.return_value = self.document
 
                     with patch("documents.admin.timezone.localtime", return_value=real_time):
                         result = approval_admin.reject_document(
-                            request=request,
-                            object_id=self.approvalqueue.pk,
-                            item_id=self.queue_item.pk
+                            request=request, object_id=self.approvalqueue.pk, item_id=self.queue_item.pk
                         )
 
                         self.assertIsInstance(result, HttpResponseRedirect)
                         self.assertEqual(result.url, "/admin/")
 
-                        mock_handle.assert_called_with(
-                            self.queue_item.pk, self.admin, "reject"
-                        )
+                        mock_handle.assert_called_with(self.queue_item.pk, self.admin, "reject")
                         mock_get.assert_called_with(id=self.document.pk)
                         mock_handle_action.assert_called_with(request, mock_handle.return_value)
 
@@ -1665,18 +1473,14 @@ class ServicesSetupTaskTest(APITestCase):
         PeriodicTask.objects.all().delete()
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
 
         from django.contrib.auth.models import Permission
@@ -1685,24 +1489,16 @@ class ServicesSetupTaskTest(APITestCase):
         content_type = ContentType.objects.get_for_model(QueueItem)
 
         approve_perm, created = Permission.objects.get_or_create(
-            codename="can_approve_document",
-            content_type=content_type,
-            defaults={"name": "Can approve document"}
+            codename="can_approve_document", content_type=content_type, defaults={"name": "Can approve document"}
         )
         reject_perm, created = Permission.objects.get_or_create(
-            codename="can_reject_document",
-            content_type=content_type,
-            defaults={"name": "Can reject document"}
+            codename="can_reject_document", content_type=content_type, defaults={"name": "Can reject document"}
         )
 
         self.admin.user_permissions.add(approve_perm, reject_perm)
         self.admin.save()
 
-        self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",
-            content_type="image/jpeg"
-        )
+        self.mock_file = SimpleUploadedFile("test_image.jpg", b"file_content", content_type="image/jpeg")
         self.document = Document.objects.create(
             owner=self.user,
             assigned_admin=self.admin,
@@ -1710,15 +1506,9 @@ class ServicesSetupTaskTest(APITestCase):
             # files=self.large_file,
         )
         self.document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.mock_file,
-            owner=self.user,
-            original_name="test_large_image.jpg"
+            document=self.document, file=self.mock_file, owner=self.user, original_name="test_large_image.jpg"
         )
-        self.approvalqueue = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin
-        )
+        self.approvalqueue = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin)
         self.queue_item = QueueItem.objects.create(
             queue=self.approvalqueue,
             document=self.document,
@@ -1750,18 +1540,14 @@ class OptimizeTaskTest(APITestCase):
         """Инициализация тестовых данных"""
 
         self.user = User.objects.create(
-            email="testuser@example.com",
-            password="testpass123",
-            first_name="Test",
-            last_name="User",
-            is_staff=False
+            email="testuser@example.com", password="testpass123", first_name="Test", last_name="User", is_staff=False
         )
         self.admin = User.objects.create(
             email="testadminuser@example.com",
             password="testpass123",
             first_name="Admin",
             last_name="User",
-            is_staff=True
+            is_staff=True,
         )
 
         from django.contrib.auth.models import Permission
@@ -1770,14 +1556,10 @@ class OptimizeTaskTest(APITestCase):
         content_type = ContentType.objects.get_for_model(QueueItem)
 
         approve_perm, created = Permission.objects.get_or_create(
-            codename="can_approve_document",
-            content_type=content_type,
-            defaults={"name": "Can approve document"}
+            codename="can_approve_document", content_type=content_type, defaults={"name": "Can approve document"}
         )
         reject_perm, created = Permission.objects.get_or_create(
-            codename="can_reject_document",
-            content_type=content_type,
-            defaults={"name": "Can reject document"}
+            codename="can_reject_document", content_type=content_type, defaults={"name": "Can reject document"}
         )
 
         self.admin.user_permissions.add(approve_perm, reject_perm)
@@ -1791,20 +1573,12 @@ class OptimizeTaskTest(APITestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.mock_file = SimpleUploadedFile(
-            "test_image.jpg",
-            b"file_content",
-            content_type="image/jpeg"
-        )
-        self.large_file = SimpleUploadedFile(
-            "large_image.jpg",
-            b"0" * (5 * 1024 * 1024),
-            content_type="image/jpeg"
-        )
+        self.mock_file = SimpleUploadedFile("test_image.jpg", b"file_content", content_type="image/jpeg")
+        self.large_file = SimpleUploadedFile("large_image.jpg", b"0" * (5 * 1024 * 1024), content_type="image/jpeg")
         self.large_file = SimpleUploadedFile(
             "test_large.jpg",
             DocumentHeavyProcessingService.generate_test_image_content(width=2000, height=2000),  # Большое изображение
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
         self.document = Document.objects.create(
             owner=self.user,
@@ -1813,15 +1587,9 @@ class OptimizeTaskTest(APITestCase):
             # files=self.large_file,
         )
         self.document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.large_file,
-            owner=self.user,
-            original_name="test_large_image.jpg"
+            document=self.document, file=self.large_file, owner=self.user, original_name="test_large_image.jpg"
         )
-        self.approvalqueue = ApprovalQueue.objects.create(
-            title="Test Approval",
-            approver=self.admin
-        )
+        self.approvalqueue = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin)
         self.queue_item = QueueItem.objects.create(
             queue=self.approvalqueue,
             document=self.document,
@@ -1842,7 +1610,7 @@ class OptimizeTaskTest(APITestCase):
             "title": "Test Document for optimize",
             "owner": self.user.pk,
             "assigned_admin": self.admin.pk,
-            "files": self.large_file
+            "files": self.large_file,
         }
 
         response = self.client.post(url, data, format="multipart")
@@ -1865,10 +1633,7 @@ class OptimizeTaskTest(APITestCase):
         """Тест логики задачи оптимизации"""
 
         document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.large_file,
-            owner=self.user,
-            original_name="test_image.jpg"
+            document=self.document, file=self.large_file, owner=self.user, original_name="test_image.jpg"
         )
 
         with patch("documents.services.DocumentHeavyProcessingService.optimize_image") as mock_optimize:
@@ -1885,10 +1650,7 @@ class OptimizeTaskTest(APITestCase):
         """Тест логики задачи оптимизации"""
 
         document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.mock_file,
-            owner=self.user,
-            original_name="test_image.jpg"
+            document=self.document, file=self.mock_file, owner=self.user, original_name="test_image.jpg"
         )
 
         with patch("documents.services.DocumentHeavyProcessingService.optimize_image") as mock_optimize:
@@ -1905,10 +1667,7 @@ class OptimizeTaskTest(APITestCase):
         """Тест когда оптимизация выбрасывает исключение"""
 
         document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.mock_file,
-            owner=self.user,
-            original_name="test_image.jpg"
+            document=self.document, file=self.mock_file, owner=self.user, original_name="test_image.jpg"
         )
 
         with patch("documents.services.DocumentHeavyProcessingService.optimize_image") as mock_optimize:
@@ -1926,10 +1685,7 @@ class OptimizeTaskTest(APITestCase):
 
         # Создаем и сразу удаляем файл
         document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.mock_file,
-            owner=self.user,
-            original_name="test_image.jpg"
+            document=self.document, file=self.mock_file, owner=self.user, original_name="test_image.jpg"
         )
         file_id = document_file.id
         document_file.delete()  # Удаляем файл
@@ -1942,10 +1698,7 @@ class OptimizeTaskTest(APITestCase):
         """Тест когда у файла нет содержимого"""
 
         document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=None,
-            owner=self.user,
-            original_name="test_image.jpg"
+            document=self.document, file=None, owner=self.user, original_name="test_image.jpg"
         )
 
         result = optimize_image_task(document_file.id)

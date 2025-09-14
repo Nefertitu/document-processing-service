@@ -83,10 +83,6 @@ class CanAccessDocumentFile(permissions.BasePermission):
             return True
 
         if request.method in permissions.SAFE_METHODS:
-            return (
-                    obj.owner == request.user or
-                    obj.document.assigned_admin == request.user
-            )
+            return obj.owner == request.user or obj.document.assigned_admin == request.user
 
         return False
-

@@ -3,10 +3,10 @@ from typing import Any, Sequence, Union
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, QuerySet, Count
-from django.http import FileResponse
-from django.http import HttpResponseForbidden
+from django.db.models import Count, Q, QuerySet
+from django.http import FileResponse, HttpResponseForbidden
 from rest_framework import permissions, status, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.permissions import BasePermission, IsAdminUser, IsAuthenticated, OperandHolder, SingleOperandHolder
 from rest_framework.request import Request
@@ -14,9 +14,16 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 
 from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
-from .paginators import DocumentPaginator, QueueItemPaginator, ApprovalItemPaginator
-from .permissions import IsOwnerOnly, IsOwnerOrAdmin, CanApproveDocument, CanRejectDocument, CanAccessDocumentFile
-from .serializers import ApprovalQueueSerializer, DocumentSerializer, DocumentAdminSerializer, FolderSerializer, QueueItemSerializer, DocumentFileSerializer
+from .paginators import ApprovalItemPaginator, DocumentPaginator, QueueItemPaginator
+from .permissions import CanAccessDocumentFile, CanApproveDocument, CanRejectDocument, IsOwnerOnly, IsOwnerOrAdmin
+from .serializers import (
+    ApprovalQueueSerializer,
+    DocumentAdminSerializer,
+    DocumentFileSerializer,
+    DocumentSerializer,
+    FolderSerializer,
+    QueueItemSerializer,
+)
 from .services import DocumentHeavyProcessingService, DocumentService, QueueService, setup_task_archive_old_documents
 from .tasks import send_single_document_email
 
@@ -36,29 +43,48 @@ class FolderViewSet(viewsets.ModelViewSet):
 
         if not self.request.user.is_superuser:
             queryset = queryset.annotate(
-                pending_count=Count("documents",
-                                    filter=Q(documents__status="pending",
-                                             documents__assigned_admin=self.request.user)),
-                approved_count=Count("documents",
-                                     filter=Q(documents__status="approved",
-                                              documents__assigned_admin=self.request.user)),
-                rejected_count=Count("documents",
-                                     filter=Q(documents__status="rejected",
-                                              documents__assigned_admin=self.request.user)),
-                archived_count=Count("documents",
-                                     filter=Q(documents__status="archived",
-                                              documents__assigned_admin=self.request.user)),
+                pending_count=Count(
+                    "documents", filter=Q(documents__status="pending", documents__assigned_admin=self.request.user)
+                ),
+                approved_count=Count(
+                    "documents", filter=Q(documents__status="approved", documents__assigned_admin=self.request.user)
+                ),
+                rejected_count=Count(
+                    "documents", filter=Q(documents__status="rejected", documents__assigned_admin=self.request.user)
+                ),
+                archived_count=Count(
+                    "documents", filter=Q(documents__status="archived", documents__assigned_admin=self.request.user)
+                ),
             )
         else:
             queryset = queryset.annotate(
-                pending_count = Count("documents", filter=Q(documents__status="pending",)),
-                approved_count = Count("documents", filter=Q(documents__status="approved",)),
-                rejected_count = Count("documents", filter=Q(documents__status="rejected",)),
-                archived_count = Count("documents", filter=Q(documents__status="archived",)),
+                pending_count=Count(
+                    "documents",
+                    filter=Q(
+                        documents__status="pending",
+                    ),
+                ),
+                approved_count=Count(
+                    "documents",
+                    filter=Q(
+                        documents__status="approved",
+                    ),
+                ),
+                rejected_count=Count(
+                    "documents",
+                    filter=Q(
+                        documents__status="rejected",
+                    ),
+                ),
+                archived_count=Count(
+                    "documents",
+                    filter=Q(
+                        documents__status="archived",
+                    ),
+                ),
             )
 
         return queryset
-
 
     def get_serializer_class(self):
         """Возвращает класс сериализатора"""
@@ -149,8 +175,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
             if request.user.is_staff or request.user.is_superuser:
                 return Response(
-                    {"error": "Администраторы не могут создавать документы"},
-                    status=status.HTTP_403_FORBIDDEN
+                    {"error": "Администраторы не могут создавать документы"}, status=status.HTTP_403_FORBIDDEN
                 )
 
             files = request.FILES.getlist("files")
@@ -160,25 +185,17 @@ class DocumentViewSet(viewsets.ModelViewSet):
             setup_task_archive_old_documents(document.pk)
 
             send_single_document_email.delay(
-                document_id=document.pk,
-                status="pending",
-                comment="Получен новый документ на согласование"
+                document_id=document.pk, status="pending", comment="Получен новый документ на согласование"
             )
 
-            view_serializer = DocumentSerializer(document, context={'request': request})
+            view_serializer = DocumentSerializer(document, context={"request": request})
 
             return Response(
-                {
-                    "data": view_serializer.data,
-                    "success": f"Документ успешно создан: '{document.title}'"
-                },
+                {"data": view_serializer.data, "success": f"Документ успешно создан: '{document.title}'"},
                 status=status.HTTP_201_CREATED,
             )
         except Exception as e:
-            return Response(
-            {"error": f"Не удалось создать документ: {e}"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+            return Response({"error": f"Не удалось создать документ: {e}"}, status=status.HTTP_400_BAD_REQUEST)
 
     @login_required
     def protected_media(request, path):
@@ -214,12 +231,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
     #     return Response(serializer.data)
 
     def perform_update(self, serializer):
-        """Если есть комментарий или файл ответа, но нет проверяющего администратора """
+        """Если есть комментарий или файл ответа, но нет проверяющего администратора"""
 
         instance = serializer.instance
 
-        if ("review_comment" in serializer.validated_data or
-                "file_answer" in serializer.validated_data):
+        if "review_comment" in serializer.validated_data or "file_answer" in serializer.validated_data:
             serializer.validated_data["reviewed_by"] = self.request.user
             instance.save()
 
@@ -259,7 +275,6 @@ class ApprovalQueueViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-
     def get_serializer_class(self):
         """Возвращает класс сериализатора"""
         return ApprovalQueueSerializer
@@ -274,21 +289,15 @@ class ApprovalQueueViewSet(viewsets.ModelViewSet):
             if not request.user.is_staff or not request.user.is_superuser:
                 return Response(
                     {"error": "Создавать очередь могут только суперпользователь или админы"},
-                    status=status.HTTP_403_FORBIDDEN
+                    status=status.HTTP_403_FORBIDDEN,
                 )
+            serializer.save()
             return Response(
-                {
-                    "data": view_serializer.data,
-                    "success": f"Очередь успешно создана!"
-                },
+                {"data": serializer.data, "success": "Очередь успешно создана!"},
                 status=status.HTTP_201_CREATED,
             )
         except Exception as e:
-            return Response(
-            {"error": f"Не удалось создать очередь: {str(e)}"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
+            return Response({"error": f"Не удалось создать очередь: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
         """Возвращает список очередей в зависимости от прав"""
@@ -313,20 +322,17 @@ class ApprovalQueueViewSet(viewsets.ModelViewSet):
                 return Response(
                     {
                         "error": "Нельзя удалить очередь с документами. "
-                                 "Сначала нужно обработать (Одобрить/Отклонить) имеющиеся документы. "
-                                 "Суперпользователь может переназначить ответственного администратора."
+                        "Сначала нужно обработать (Одобрить/Отклонить) имеющиеся документы. "
+                        "Суперпользователь может переназначить ответственного администратора."
                     },
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
             elif documents_count == 0:
                 instance.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
         else:
-            return Response(
-                {"error": "У вас нет прав для удаления очереди."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({"error": "У вас нет прав для удаления очереди."}, status=status.HTTP_403_FORBIDDEN)
 
 
 class QueueItemViewSet(viewsets.ModelViewSet):
@@ -355,7 +361,9 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         if user.is_staff:
             print(f"👨‍💼 Staff user - filtering by assigned_admin: {user.id}")
             assigned_docs = QueueItem.objects.filter(document__status="pending", document__assigned_admin=user)
-            print(f"📋 Documents assigned to admin: {list(assigned_docs.values_list('id', 'document'))}, статус: {[assigned_doc.document.status for assigned_doc in assigned_docs]}")
+            print(
+                f"📋 Documents assigned to admin: {list(assigned_docs.values_list('id', 'document'))}, статус: {[assigned_doc.document.status for assigned_doc in assigned_docs]}"
+            )
             return assigned_docs
 
             # Обычные пользователи видят только свои документы
@@ -371,9 +379,11 @@ class QueueItemViewSet(viewsets.ModelViewSet):
             obj = QueueItem.objects.get(pk=self.kwargs.get("pk"))
 
             user = self.request.user
-            if not (user.is_superuser or
-                    (user.is_staff and obj.document.assigned_admin == user) or
-                    obj.document.owner == user):
+            if not (
+                user.is_superuser
+                or (user.is_staff and obj.document.assigned_admin == user)
+                or obj.document.owner == user
+            ):
                 raise PermissionDenied("У вас нет прав для доступа к этому элементу очереди")
 
             return obj
@@ -398,11 +408,16 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         print(f"🔍 До обновления - document.review_comment: {document.review_comment}")
 
         allowed_fields = ["status", "temp_review_comment", "temp_file_answer"]
-        data = {key: value for key, value in request.data.items() if key in allowed_fields}
+
+        filtered_data = {
+            key: value
+            for key, value in request.data.items()
+            if key in allowed_fields
+        }
 
         serializer = self.get_serializer(
             instance,
-            data=request.data,
+            data=filtered_data,
             partial=True,
         )
 
@@ -429,18 +444,12 @@ class QueueItemViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def approve(self, request: Request, pk: int = None) -> Response:
-        """Одобрение документа через сервис с комментарием и/или ответным файлом """
+        """Одобрение документа через сервис с комментарием и/или ответным файлом"""
 
         review_comment = request.data.get("temp_review_comment", "")
         file_answer = request.data.get("temp_file_answer", None)
 
-        result = DocumentService.handle_queue_action(
-            pk,
-            request.user,
-            "approve",
-            review_comment,
-            file_answer
-        )
+        result = DocumentService.handle_queue_action(pk, request.user, "approve", review_comment, file_answer)
         return self._handle_service_response(result)
 
     @action(detail=True, methods=["post"])
@@ -450,13 +459,7 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         review_comment = request.data.get("temp_review_comment", "")
         file_answer = request.data.get("temp_file_answer", "")
 
-        result = DocumentService.handle_queue_action(
-            pk,
-            request.user,
-            "reject",
-            review_comment,
-            file_answer
-        )
+        result = DocumentService.handle_queue_action(pk, request.user, "reject", review_comment, file_answer)
         return self._handle_service_response(result)
 
     def _handle_service_response(self, result: dict) -> Response:
