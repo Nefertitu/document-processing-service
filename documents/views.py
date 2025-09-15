@@ -482,6 +482,10 @@ class DocumentFileViewSet(viewsets.ModelViewSet):
 
     serializer_class = DocumentFileSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ["file", "original_name"]
+    ordering_fields = ["uploaded_at", "file__size"]
+    ordering = ["-uploaded_at"]
 
     def get_queryset(self):
         """Возвращает 'queryset' в зависимости от прав"""
