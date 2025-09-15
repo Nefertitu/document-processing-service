@@ -234,6 +234,8 @@ jobs:
           
           [ -f docker-compose.yml ] || { echo 'Error: docker-compose.yml not found'; ls -la; exit 1; }
           
+          sudo chown -R ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} /opt/document_service
+          
           cat > .env << 'ENV_EOF'
           POSTGRES_USER=${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
@@ -247,6 +249,10 @@ jobs:
           DEBUG=False
           ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}
           ENV_EOF
+          
+          echo ".env file created successfully"
+          cat .env
+          EOF
           
           docker-compose down
           docker-compose up -d --build
