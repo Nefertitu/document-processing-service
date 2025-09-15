@@ -265,16 +265,20 @@ jobs:
           
           echo "Waiting for database to become healthy..."
           timeout 180s bash -c 'until docker-compose ps db | grep -q "healthy"; do sleep 5; echo "Waiting..."; done'
-          
-          if command -v docker-compose &> /dev/null; then
-            docker-compose down
-            docker-compose up -d --build
-          elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
-            docker compose down
-            docker compose up -d --build
-          else
-            echo 'Error: docker-compose not found'
-            exit 1
+               
+               if command -v docker compose &> /dev/null; then
+               echo "Using: docker compose"
+               docker compose up -d --build
+               elif command -v docker-compose &> /dev/null; then
+               echo "Using: docker-compose"
+               docker-compose up -d --build
+               else
+               echo "Installing docker-compose..."
+               sudo apt-get update
+               sudo apt-get install -y curl
+               sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+               sudo chmod +x /usr/local/bin/docker-compose
+               docker-compose up -d --build
           fi
           
           sleep 10
