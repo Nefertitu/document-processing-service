@@ -26,8 +26,7 @@ COPY . .
 
 RUN adduser --disabled-password --gecos '' appuser
 
-RUN mkdir -p /app/static /app/staticfiles /app/media /var/celerybeat-schedule && \
-    mkdir -p /app/media/documents /app/media/temp_uploads /app/media/temp_answers && \
+RUN mkdir -p /app/static /app/staticfiles /app/media /app/media/documents /app/media/temp_uploads /app/media/temp_answers /var/celerybeat-schedule && \
     chown -R appuser:appuser /app/static /app/staticfiles /app/media /var/celerybeat-schedule && \
     chmod -R 755 /app/static /app/staticfiles /app/static /app/media /var/celerybeat-schedule
 
