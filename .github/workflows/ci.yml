@@ -248,6 +248,12 @@ jobs:
           ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}
           ENV_EOF
           
+          docker-compose down
+          docker-compose up -d --build
+          
+          echo "Waiting for database to become healthy..."
+          timeout 180s bash -c 'until docker-compose ps db | grep -q "healthy"; do sleep 5; echo "Waiting..."; done'
+          
           if command -v docker-compose &> /dev/null; then
             docker-compose down
             docker-compose up -d --build
