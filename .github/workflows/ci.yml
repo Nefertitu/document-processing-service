@@ -220,71 +220,26 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "
           set -e
-          set -x
           cd /opt/document_service || { echo 'Error: Directory not found'; exit 1; }
-          if ! command -v docker-compose &> /dev/null && ! command -v docker compose &> /dev/null; then
-          echo 'Installing docker-compose...'
-          sudo apt-get update
-          sudo apt-get install -y curl
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          sudo ln -s /usr/local/bin/docker-compose /usr/local/bin/docker-compose
-          fi
-          echo "Docker Compose versions:"
-          docker-compose --version || true
-          docker compose version || true
-          docker compose up -d --build
-          EOF
-          
-#          [ -f docker-compose.yml ] || { echo 'Error: docker-compose.yml not found'; ls -la; exit 1; }
-          
-          sudo chown -R ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} /opt/document_service
-          
-          cat > .env << 'ENV_EOF'
-          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-          POSTGRES_SUPERUSER_PASSWORD=${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}
-          POSTGRES_HOST=db
-          POSTGRES_PORT=5432
-          CELERY_BROKER_URL=redis://redis:6379/1
-          CELERY_RESULT_BACKEND=redis://redis:6379/1
+          [ -f docker-compose.yml ] || { echo 'Error: docker-compose.yml not found'; ls -la; exit 1; }
+          echo 'POSTGRES_USER=${{ secrets.POSTGRES_USER }}' > .env
+          echo 'POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}' >> .env
+          echo 'POSTGRES_DB=${{ secrets.POSTGRES_DB }}' >> .env
+          echo 'SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}' >> .env
+          echo 'SECRET_KEY=${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}' >> .env
+          echo "POSTGRES_HOST=db" >> /opt/document_service/.env
+          echo "POSTGRES_PORT=5432" >> /opt/document_service/.env
+          echo "CELERY_BROKER_URL=redis://redis:6379/1" >> /opt/document_service/.env
+          echo "CELERY_RESULT_BACKEND=redis://redis:6379/1" >> /opt/document_service/.env
           DEBUG=False
-          ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}
-          ENV_EOF
-          
-          echo ".env file created successfully"
-          cat .env
-          EOF
-          
-          docker-compose down
-          docker-compose up -d --build
-          
-          echo "Waiting for database to become healthy..."
-          timeout 180s bash -c 'until docker-compose ps db | grep -q "healthy"; do sleep 5; echo "Waiting..."; done'
-               
-               if command -v docker compose &> /dev/null; then
-               echo "Using: docker compose"
-               docker compose up -d --build
-               elif command -v docker-compose &> /dev/null; then
-               echo "Using: docker-compose"
-               docker-compose up -d --build
-               else
-               echo "Installing docker-compose..."
-               sudo apt-get update
-               sudo apt-get install -y curl
-               sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-               sudo chmod +x /usr/local/bin/docker-compose
-               docker-compose up -d --build
-          fi
-          
-          sleep 10
+          echo 'ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}' >> .env
+          docker compose down
+          docker compose up -d --build
           docker ps -a
-          EOF
-
+          "
+          
       - name: Apply migrations on production
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "
