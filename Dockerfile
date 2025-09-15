@@ -17,12 +17,12 @@ RUN curl -sSL https://install.python-poetry.org | python3 - --version $POETRY_VE
 
 WORKDIR /app
 
-COPY pyproject.toml poetry.lock* /app/
+COPY pyproject.toml poetry.lock ./
 
 RUN poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --only main --no-root
 
-COPY . /app
+COPY . .
 
 RUN adduser --disabled-password --gecos '' appuser
 
