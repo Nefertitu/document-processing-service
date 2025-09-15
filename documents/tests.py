@@ -135,6 +135,8 @@ class DocumentTestCase(APITestCase):
         url = reverse("documents:document-list")
         response = self.client.get(url)
         data = response.json()
+        print(f"data999 список: {data}")
+
         document = self.document
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

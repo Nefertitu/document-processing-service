@@ -137,9 +137,20 @@ celerybeat-schedule
 # SageMath parsed files
 *.sage.py
 
+# Local settings
+config/local_settings.py
+*.local_settings.py
+local_settings.py
+
+# IDE
+.vscode/
+.idea/
+
 # Environments
 .ini
 .env
+.env.local
+.env.*.local
 .venv
 env/
 venv/

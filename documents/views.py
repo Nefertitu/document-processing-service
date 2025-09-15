@@ -101,8 +101,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
     pagination_class = DocumentPaginator
     filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
     search_fields = ["title", "owner__full_name", "reviewed_by__full_name", "uploaded_at"]   # Пример запроса: /api/documents/?search=financial
-    ordering_fields = ["updated_at", "title", "assigned_admin", "reviewed_at", "reviewed_by"]   # Пример запроса: /api/documents/?ordering=-created_at,title
-    ordering = ["-updated_at"]
+    ordering_fields = ["uploaded_at", "title", "assigned_admin", "reviewed_at", "reviewed_by"]   # Пример запроса: /api/documents/?ordering=-created_at,title
+    ordering = ["-uploaded_at"]
     filterset_fields = ["status", "owner"]   # Пример запроса: /api/documents/?status=pending&owner=1
 
     PermissionClass = Union[type[BasePermission], OperandHolder, SingleOperandHolder]
