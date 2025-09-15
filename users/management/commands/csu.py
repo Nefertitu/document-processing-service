@@ -17,7 +17,7 @@ class Command(BaseCommand):
         User = get_user_model()
         email = os.getenv("SUPERUSER_EMAIL", "superuser@example.com")
         password = os.getenv("SUPERUSER_PASSWORD", "123qwer")
-        first_name = os.getenv("SUPERUSER_NAME", "superuser")
+        first_name = os.getenv("SUPERUSER_FIRST_NAME", "superuser")
 
         if not User.objects.filter(email=email).exists():
             user = User.objects.create(
