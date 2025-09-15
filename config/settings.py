@@ -66,13 +66,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # other apps
-    # "health_check",
-    # "health_check.db",
-    # "health_check.cache",
-    # "health_check.storage",
-    # "health_check.contrib.migrations",
-    # "health_check.contrib.celery",
-    # "health_check.contrib.redis",
+    "health_check",
+    "health_check.db",
+    "health_check.cache",
+    "health_check.storage",
+    "health_check.contrib.migrations",
+    "health_check.contrib.celery",
+    "health_check.contrib.redis",
     "rest_framework",
     "django_filters",
     "rest_framework_simplejwt",
@@ -176,13 +176,11 @@ if "test" in sys.argv:
     CELERY_RESULT_BACKEND = "cache+memory://"
     CELERY_ACCEPT_CONTENT = ["json"]
     CELERY_TASK_SERIALIZER = "json"
-    # TELEGRAM_BOT_TOKEN = "test-token"
 else:
     CELERY_BROKER_URL = os.getenv("LOCATION")
     CELERY_RESULT_BACKEND = os.getenv("LOCATION")
     CELERY_ACCEPT_CONTENT = ["json"]
     CELERY_TASK_SERIALIZER = "json"
-    # TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 
 AUTH_USER_MODEL = "users.User"

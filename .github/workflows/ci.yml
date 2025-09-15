@@ -220,25 +220,48 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
           set -e
+          
           cd /opt/document_service || { echo 'Error: Directory not found'; exit 1; }
+          if ! command -v docker-compose &> /dev/null && ! command -v docker compose &> /dev/null; then
+            echo 'Installing docker-compose...'
+            sudo apt-get update
+            sudo apt-get install -y curl
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
           [ -f docker-compose.yml ] || { echo 'Error: docker-compose.yml not found'; ls -la; exit 1; }
-          echo 'POSTGRES_USER=${{ secrets.POSTGRES_USER }}' > .env
-          echo 'POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}' >> .env
-          echo 'POSTGRES_DB=${{ secrets.POSTGRES_DB }}' >> .env
-          echo 'SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}' >> .env
-          echo 'SECRET_KEY=${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}' >> .env
-          echo "POSTGRES_HOST=db" >> /opt/document_service/.env
-          echo "POSTGRES_PORT=5432" >> /opt/document_service/.env
-          echo "CELERY_BROKER_URL=redis://redis:6379/1" >> /opt/document_service/.env
-          echo "CELERY_RESULT_BACKEND=redis://redis:6379/1" >> /opt/document_service/.env
+          
+          cat > .env << 'ENV_EOF'
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          POSTGRES_SUPERUSER_PASSWORD=${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}
+          POSTGRES_HOST=db
+          POSTGRES_PORT=5432
+          CELERY_BROKER_URL=redis://redis:6379/1
+          CELERY_RESULT_BACKEND=redis://redis:6379/1
           DEBUG=False
-          echo 'ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}' >> .env
-          docker compose down
-          docker compose up -d --build
+          ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}
+          ENV_EOF
+          
+          if command -v docker-compose &> /dev/null; then
+            docker-compose down
+            docker-compose up -d --build
+          elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+            docker compose down
+            docker compose up -d --build
+          else
+            echo 'Error: docker-compose not found'
+            exit 1
+          fi
+          
+          sleep 10
           docker ps -a
-          "
+          EOF
 
       - name: Apply migrations on production
         run: |
