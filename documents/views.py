@@ -5,6 +5,8 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, QuerySet
 from django.http import FileResponse, HttpResponseForbidden
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework import permissions, status, viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
@@ -97,6 +99,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
     serializer_class = DocumentSerializer
     permission_classes = [IsOwnerOrAdmin]
     pagination_class = DocumentPaginator
+    filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
+    search_fields = ["title", "owner__full_name", "reviewed_by__full_name", "uploaded_at"]   # Пример запроса: /api/documents/?search=financial
+    ordering_fields = ["updated_at", "title", "assigned_admin", "reviewed_at", "reviewed_by"]   # Пример запроса: /api/documents/?ordering=-created_at,title
+    ordering = ["-updated_at"]
+    filterset_fields = ["status", "owner"]   # Пример запроса: /api/documents/?status=pending&owner=1
 
     PermissionClass = Union[type[BasePermission], OperandHolder, SingleOperandHolder]
 
