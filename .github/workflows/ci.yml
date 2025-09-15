@@ -184,7 +184,7 @@ jobs:
           if [ ! -f /usr/local/bin/docker-compose ]; then
             sudo ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
           fi
-          docker compose version
+          docker-compose version
           "
 
       - name: Create directories and set permissions
