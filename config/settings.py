@@ -272,3 +272,6 @@ if not DEBUG:
     AWS_S3_OBJECT_PARAMETERS = {
         "CacheControl": "max-age=86400",
     }
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB в байтах
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800   # 50 MB в байтах

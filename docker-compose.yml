@@ -45,6 +45,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/client_max_body_size.conf:/etc/nginx/conf.d/client_max_body_size.conf
       - static_volume:/app/staticfiles
       - ./media:/app/media
     depends_on:
