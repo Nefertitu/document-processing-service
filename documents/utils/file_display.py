@@ -40,7 +40,7 @@ def get_files_display_html(document_files):
                 file_name = doc_file.original_name or doc_file.file.name.split("/")[-1]
                 file_extension = doc_file.file.name.split(".")[-1].lower() if "." in doc_file.file.name else "file"
 
-                if file_extension == '':
+                if file_extension == "":
                     file_extension = "file"
 
                 print(f"DEBUG: file_extension = {file_extension}, {file_name}")
@@ -121,14 +121,11 @@ def get_file_answer_display(document_file):
 
     try:
 
-        file_name = doc_file.original_name or doc_file.file.name.split("/")[-1]
-        file_extension = doc_file.file.name.split(".")[-1].lower() if "." in doc_file.file.name else "file"
+        file_name = document_file.original_name or document_file.file.name.split("/")[-1]
+        file_extension = document_file.file.name.split(".")[-1].lower() if "." in document_file.file.name else "file"
 
-        if file_extension == '':
+        if file_extension == "":
             file_extension = "file"
-
-        print(f"DEBUG: file_extension = {file_extension}")
-        print(f"DEBUG: in viewable = {file_extension in viewable_extensions}")
 
         try:
             file_size = document_file.file.size
