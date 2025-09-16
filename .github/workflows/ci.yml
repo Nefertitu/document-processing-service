@@ -172,9 +172,9 @@ jobs:
       - name: Test SSH connection
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "echo 'SSH connection successful'"
-          cd /opt/document_service
-          docker-compose up -d --build
-          "
+#          cd /opt/document_service
+#          docker-compose up -d --build
+#          "
 
       - name: Install Docker Compose on remote
         run: |
