@@ -100,10 +100,21 @@ class DocumentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOwnerOrAdmin]
     pagination_class = DocumentPaginator
     filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
-    search_fields = ["title", "owner__full_name", "reviewed_by__full_name", "uploaded_at"]   # Пример запроса: /api/documents/?search=financial
-    ordering_fields = ["uploaded_at", "title", "assigned_admin", "reviewed_at", "reviewed_by"]   # Пример запроса: /api/documents/?ordering=-created_at,title
+    search_fields = [
+        "title",
+        "owner__full_name",
+        "reviewed_by__full_name",
+        "uploaded_at",
+    ]  # Пример запроса: /api/documents/?search=financial
+    ordering_fields = [
+        "uploaded_at",
+        "title",
+        "assigned_admin",
+        "reviewed_at",
+        "reviewed_by",
+    ]  # Пример запроса: /api/documents/?ordering=-created_at,title
     ordering = ["-uploaded_at"]
-    filterset_fields = ["status", "owner"]   # Пример запроса: /api/documents/?status=pending&owner=1
+    filterset_fields = ["status", "owner"]  # Пример запроса: /api/documents/?status=pending&owner=1
 
     PermissionClass = Union[type[BasePermission], OperandHolder, SingleOperandHolder]
 
@@ -416,11 +427,7 @@ class QueueItemViewSet(viewsets.ModelViewSet):
 
         allowed_fields = ["status", "temp_review_comment", "temp_file_answer"]
 
-        filtered_data = {
-            key: value
-            for key, value in request.data.items()
-            if key in allowed_fields
-        }
+        filtered_data = {key: value for key, value in request.data.items() if key in allowed_fields}
 
         serializer = self.get_serializer(
             instance,

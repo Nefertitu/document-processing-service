@@ -148,14 +148,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # if DEBUG:
 #     STATICFILES_DIRS = [
 #         BASE_DIR / "static"
-        # BASE_DIR / "staticfiles"
+# BASE_DIR / "staticfiles"
 #     ]
 # else:
 #     STATICFILES_DIRS = []
 
-STATICFILES_DIRS = [
-        BASE_DIR / "static"
-    ]
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 MEDIA_URL = "/media/"
 
