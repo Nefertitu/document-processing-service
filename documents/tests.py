@@ -928,14 +928,13 @@ class DocumentHeavyProcessingServiceTest(APITestCase):
         """Интеграционный тест реального уменьшения размера файла"""
 
         small_file = SimpleUploadedFile(
-            "small_test.jpg",
-            b"x" * 500,  # 500 байт - точно меньше 10MB
-            content_type="image/jpeg"
+            "small_test.jpg", b"x" * 500, content_type="image/jpeg"  # 500 байт - точно меньше 10MB
         )
 
         result = DocumentHeavyProcessingService.optimize_image(small_file)
 
         self.assertIsNone(result)
+
 
 class ArchiveOldDocumentTaskTest(APITestCase):
     """Тест кейс для проверки работы сервиса и задачи по переносу документов в архив"""
@@ -1632,10 +1631,7 @@ class OptimizeTaskTest(APITestCase):
         """Тест ПРОПУСКА оптимизации (возвращает 'skipped')"""
 
         document_file = DocumentFile.objects.create(
-            document=self.document,
-            file=self.mock_file,
-            owner=self.user,
-            original_name="test_image.jpg"
+            document=self.document, file=self.mock_file, owner=self.user, original_name="test_image.jpg"
         )
 
         with patch("documents.services.DocumentHeavyProcessingService.optimize_image") as mock_optimize:
@@ -1646,19 +1642,21 @@ class OptimizeTaskTest(APITestCase):
             self.assertEqual(result, "skipped")
             mock_optimize.assert_called_once()
 
+
 def test_optimize_image_task_file_not_found(self):
-        """Тест когда файл не найден в базе"""
+    """Тест когда файл не найден в базе"""
 
-        # Создаем и сразу удаляем файл
-        document_file = DocumentFile.objects.create(
-            document=self.document, file=self.mock_file, owner=self.user, original_name="test_image.jpg"
-        )
-        file_id = document_file.id
-        document_file.delete()  # Удаляем файл
+    # Создаем и сразу удаляем файл
+    document_file = DocumentFile.objects.create(
+        document=self.document, file=self.mock_file, owner=self.user, original_name="test_image.jpg"
+    )
+    file_id = document_file.id
+    document_file.delete()  # Удаляем файл
 
-        result = optimize_image_task(file_id)
+    result = optimize_image_task(file_id)
 
-        self.assertEqual(result, None)
+    self.assertEqual(result, None)
+
 
 def test_optimize_image_task_no_file(self):
     """Тест когда у файла нет содержимого"""
