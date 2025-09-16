@@ -115,7 +115,7 @@ def optimize_image_task(document_file_id):
 
         print("Найдены файлы оптимизации")
         print(f"📁 Обрабатываем: {document_file.file.name}")
-        original_filename = os.path.basename(document_file.file.name)
+        original_filename = os.path.basename(document_file.file.name) if document_file.file.name else "document.jpg"
         print(f"🔄 Оптимизация файла: {original_filename} (ID: {document_file_id})")
 
         print("⚙️ Вызов DocumentHeavyProcessingService.optimize_image")

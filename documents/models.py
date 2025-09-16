@@ -132,7 +132,7 @@ class Document(models.Model):
         related_name="reviewed_documents",
     )
     file_answer = models.FileField(
-        upload_to="documents.services.DocumentFilePathGeneratorService.admin_document_path",
+        upload_to=DocumentFilePathGeneratorService.admin_document_path,
         blank=True,
         null=True,
         verbose_name="Ответный файл администратора",
@@ -193,7 +193,7 @@ class DocumentFile(models.Model):
     )
     file = models.FileField(
         verbose_name="Расположение vs название файла",
-        upload_to="documents.services.DocumentFilePathGeneratorService.user_document_path",
+        upload_to=DocumentFilePathGeneratorService.user_document_path,
         help_text="Загрузите файл",
     )
     owner = models.ForeignKey(
@@ -337,7 +337,7 @@ class QueueItem(models.Model):
     temp_file_answer = models.FileField(
         verbose_name="Черновик файла ответа",
         # upload_to='temp_answers/',
-        upload_to="documents.services.DocumentFilePathGeneratorService.admin_document_path",
+        upload_to=DocumentFilePathGeneratorService.admin_document_path,
         blank=True,
         null=True,
     )

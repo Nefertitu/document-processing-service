@@ -68,7 +68,7 @@ class DocumentFilePathGeneratorService:
 class DocumentHeavyProcessingService:
     """Сервис для тяжелых операций с документами"""
 
-    MAX_SIZE_MB = 0.1
+    MAX_SIZE_MB = 10.0
     MAX_WIDTH = 1200
     MAX_HEIGHT = 800
 
