@@ -38,7 +38,13 @@ def get_files_display_html(document_files):
         if doc_file.file:
             try:
                 file_name = doc_file.original_name or doc_file.file.name.split("/")[-1]
-                file_extension = file_name.split(".")[-1].lower() if "." in file_name else "file"
+                file_extension = doc_file.file.name.split(".")[-1].lower() if "." in doc_file.file.name else "file"
+
+                if file_extension == '':
+                    file_extension = "file"
+
+                print(f"DEBUG: file_extension = {file_extension}, {file_name}")
+                print(f"DEBUG: in viewable = {file_extension in viewable_extensions}")
 
                 file_icon = icon_map.get(file_extension, "📁")
                 file_name = file_icon
@@ -115,8 +121,14 @@ def get_file_answer_display(document_file):
 
     try:
 
-        file_name = document_file.file.name.split("/")[-1]
-        file_extension = file_name.split(".")[-1].lower() if "." in file_name else "file"
+        file_name = doc_file.original_name or doc_file.file.name.split("/")[-1]
+        file_extension = doc_file.file.name.split(".")[-1].lower() if "." in doc_file.file.name else "file"
+
+        if file_extension == '':
+            file_extension = "file"
+
+        print(f"DEBUG: file_extension = {file_extension}")
+        print(f"DEBUG: in viewable = {file_extension in viewable_extensions}")
 
         try:
             file_size = document_file.file.size

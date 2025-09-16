@@ -219,7 +219,15 @@ newgrp docker
 SUPERUSER_EMAIL=your_email@example.com
 SUPERUSER_PASSWORD=your_secure_password
 ```
-6. Проверка работоспособности:
+6. Создайте папки media на хосте:
+```
+mkdir -p /opt/document_service/media/documents
+mkdir -p /opt/document_service/media/temp_uploads  
+mkdir -p /opt/document_service/media/temp_answers
+sudo chown -R 1000:1000 /opt/document_service/media
+sudo chmod -R 775 /opt/document_service/media
+```
+7. Проверка работоспособности:
 * После деплоя проверьте:
 - Статус контейнеров
 ```
@@ -239,7 +247,7 @@ docker compose exec web ls -la /app/staticfiles/
 ```
 curl -I http://your-server-ip/static/admin/css/base.css
 ```
-7. Доступ к админке:
+8. Доступ к админке:
 
 * Для первого входа выполните команду для создания суперпользователя:
 ```
@@ -247,7 +255,7 @@ docker-compose exec web python manage.py csu
 ```
 * Откройте в браузере: http://your-server-ip/admin/
 
-8. Проверка эндпоинтов:
+9. Проверка эндпоинтов:
 
 - Проверка корневого URL
 ```

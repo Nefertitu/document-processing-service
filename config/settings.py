@@ -275,3 +275,24 @@ if not DEBUG:
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB в байтах
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB в байтах
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        "documents": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+        },
+    },
+}
