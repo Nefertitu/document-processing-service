@@ -141,17 +141,21 @@ USE_I18N = True
 USE_TZ = True
 
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-if DEBUG:
-    STATICFILES_DIRS = [
-        # BASE_DIR / "static"
-        BASE_DIR / "staticfiles"
+# if DEBUG:
+#     STATICFILES_DIRS = [
+#         BASE_DIR / "static"
+        # BASE_DIR / "staticfiles"
+#     ]
+# else:
+#     STATICFILES_DIRS = []
+
+STATICFILES_DIRS = [
+        BASE_DIR / "static"
     ]
-else:
-    STATICFILES_DIRS = []
 
 MEDIA_URL = "/media/"
 
