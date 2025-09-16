@@ -199,6 +199,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "reviewed_by",
         "reviewed_at",
         "review_comment",
+        "file_answer",
     ]
 
     list_per_page = 10

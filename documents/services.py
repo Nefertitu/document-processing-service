@@ -37,7 +37,13 @@ class DocumentFilePathGeneratorService:
     def admin_document_path(instance: models.Model, filename: str) -> str:
         """Путь для файлов, загружаемых администраторами"""
 
-        admin_id = getattr(instance.document.assigned_admin, "id", "system")
+        if isinstance(instance, DocumentFile):
+            admin_id = getattr(instance.document.assigned_admin, "id", "system")
+        elif isinstance(instance, Document):
+            admin_id = getattr(instance.assigned_admin, "id", "system")
+        else:
+            admin_id = "system"
+
         return DocumentFilePathGeneratorService._generate_path(filename, "admin", admin_id)
 
     # @staticmethod   # использование метода возможно при реализации цикла работы с архивными документами

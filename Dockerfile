@@ -30,11 +30,7 @@ RUN mkdir -p /app/static /app/staticfiles /app/media /var/celerybeat-schedule &&
     chown -R appuser:appuser /app/static /app/staticfiles /app/media /var/celerybeat-schedule && \
     chmod -R 775 /app/static /app/staticfiles /app/media /var/celerybeat-schedule
 
-RUN mkdir -p /app/media/documents /app/media/temp_uploads /app/media/temp_answers && \
-    chown -R appuser:appuser /app/media && \
-    chmod -R 775 /app/media
-
-RUN chown -R appuser:appuser /app/media
+RUN mkdir -p /media/documents /media/temp_uploads /media/temp_answers
 
 RUN rm -rf ~/.cache/pip
 
