@@ -177,7 +177,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "review_comment",
         "get_reviewed_by",
         "get_file_answer",
-        # "file_answer",
+        "file_answer",
     )
 
     list_filter = ("status",)
@@ -198,6 +198,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "uploaded_at",
         "reviewed_by",
         "reviewed_at",
+        "review_comment",
     ]
 
     list_per_page = 10
