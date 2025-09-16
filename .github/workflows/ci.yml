@@ -249,14 +249,6 @@ jobs:
           docker ps -a
           "
 
-#      - name: Verify deployment
-#        run: |
-#          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "
-#            cd /opt/document_service
-#            docker-compose ps
-#            docker-compose logs web --tail=20
-#          "
-
       - name: Apply migrations on production
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "

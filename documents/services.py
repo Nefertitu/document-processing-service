@@ -37,6 +37,8 @@ class DocumentFilePathGeneratorService:
     def admin_document_path(instance: models.Model, filename: str) -> str:
         """Путь для файлов, загружаемых администраторами"""
 
+        from .models import Document, DocumentFile
+
         if isinstance(instance, DocumentFile):
             admin_id = getattr(instance.document.assigned_admin, "id", "system")
         elif isinstance(instance, Document):
