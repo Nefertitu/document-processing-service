@@ -237,7 +237,7 @@ jobs:
           echo 'POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}' >> /opt/document_service/.env
           echo 'POSTGRES_DB=${{ secrets.POSTGRES_DB }}' >> /opt/document_service/.env
           echo 'SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}' >> /opt/document_service/.env
-          echo 'SECRET_KEY=${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}' >> /opt/document_service/.env
+          echo 'POSTGRES_SUPERUSER_PASSWORD=${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}' >> /opt/document_service/.env
           echo "POSTGRES_HOST=db" >> /opt/document_service/.env
           echo "POSTGRES_PORT=5432" >> /opt/document_service/.env
           echo "CELERY_BROKER_URL=redis://redis:6379/1" >> /opt/document_service/.env
