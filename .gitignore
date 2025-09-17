@@ -193,3 +193,6 @@ cython_debug/
 #npm-debug.log
 #.yarn-integrity
 media/temp_*
+
+# Django static files
+staticfiles/

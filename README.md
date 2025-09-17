@@ -227,7 +227,12 @@ mkdir -p /opt/document_service/media/temp_answers
 sudo chown -R 1000:1000 /opt/document_service/media
 sudo chmod -R 775 /opt/document_service/media
 ```
-7. Проверка работоспособности:
+7. Для подключения стилей в админке выполнить в терминале сервера:
+```
+python manage.py collectstatic --noinput
+```
+
+8. Проверка работоспособности:
 * После деплоя проверьте:
 - Статус контейнеров
 ```
@@ -247,7 +252,7 @@ docker compose exec web ls -la /app/staticfiles/
 ```
 curl -I http://your-server-ip/static/admin/css/base.css
 ```
-8. Доступ к админке:
+9. Доступ к админке:
 
 * Для первого входа выполните команду для создания суперпользователя:
 ```
@@ -255,7 +260,7 @@ docker-compose exec web python manage.py csu
 ```
 * Откройте в браузере: http://your-server-ip/admin/
 
-9. Проверка эндпоинтов:
+10. Проверка эндпоинтов:
 
 - Проверка корневого URL
 ```

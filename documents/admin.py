@@ -217,9 +217,6 @@ class DocumentAdmin(CustomModelAdmin):
     show_full_result_count = True
     extra = 0
 
-    class Media:
-        css = {"all": ("/static/admin/css/custom.css",)}
-
     def has_add_permission(self, request, obj=None):
         """Запрет добавлять элементы вручную"""
         return False
@@ -254,7 +251,7 @@ class DocumentAdmin(CustomModelAdmin):
         """Отображает ответный файл документа"""
 
         if obj.file_answer:
-            return get_file_answer_display(obj.file_answer.file)
+            return get_file_answer_display(obj.file_answer)
         return "Документ отсутствует"
 
     get_file_answer.short_description = "Ответный файл администратора 📌"
@@ -419,7 +416,7 @@ class QueueItemInline(admin.TabularInline):
             kwargs["widget"] = forms.Textarea(
                 attrs={
                     "rows": 5,
-                    "style": "width: 100%; padding: 6px; border: 2px solid #40E0D0; border-radius: 8px;",
+                    "style": "width: 98%; padding: 6px; border: 2px solid #40E0D0; border-radius: 8px;",
                     "placeholder": "Введите комментарий по итогам проверки...",
                 }
             )

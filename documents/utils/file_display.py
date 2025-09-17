@@ -121,8 +121,10 @@ def get_file_answer_display(document_file):
 
     try:
 
-        file_name = document_file.original_name or document_file.file.name.split("/")[-1]
-        file_extension = document_file.file.name.split(".")[-1].lower() if "." in document_file.file.name else "file"
+        file_name = document_file.name.split("/")[-1]
+        original_name = getattr(document_file, 'original_name', file_name)
+
+        file_extension = file_name.split(".")[-1].lower() if "." in file_name else "file"
 
         if file_extension == "":
             file_extension = "file"
@@ -152,7 +154,8 @@ def get_file_answer_display(document_file):
             "rar": "📦",
         }
         icon = icon_map.get(file_extension, "📁")
-        file_name = icon
+        # file_name = icon
+        file_url = document_file.url if hasattr(document_file, "url") else f"/media/{document_file.name}"
 
         return format_html(
             '<div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">'
@@ -167,12 +170,14 @@ def get_file_answer_display(document_file):
             '<span style="color: #999; font-size: 11px;">размер: {}</span>'
             "</div>"
             "</div>",
-            document_file.url,
-            document_file.url,
-            file_name,
+            file_url,
+            file_url,
+            original_name,
+            icon,
             file_extension.upper(),
-            size_str,
+            size_str
         )
 
     except Exception as e:
         print(f"Ошибка при обработке файла {document_file.name}: {e}")
+        return format_html('<span style="color: red;">Ошибка загрузки файла</span>')
