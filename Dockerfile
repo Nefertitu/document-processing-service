@@ -31,6 +31,8 @@ RUN chmod +x /docker-entrypoint.sh
 
 RUN rm -rf ~/.cache/pip
 
+RUN chown -R appuser:appuser /app
+
 USER appuser
 
 EXPOSE 8000
