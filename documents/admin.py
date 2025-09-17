@@ -15,10 +15,21 @@ from .services import DocumentService, QueueService, get_next_available_admin
 from .tasks import send_single_document_email
 
 
-class DocumentFileInline(admin.TabularInline):
-    model = DocumentFile
-    extra = 1
-    readonly_fields = ["original_name", "uploaded_at", "file_link", "owner"]
+class CustomAdminSite(AdminSite):
+    def each_context(self, request):
+        context = super().each_context(request)
+        context["css"] = {
+            "custom": "/static/admin/css/custom.css"
+        }
+        return context
+
+
+#
+# class DocumentFileInline(admin.TabularInline):
+#     """'InLine' для отображения файлов внутри элементов очереди"""
+#     model = DocumentFile
+#     extra = 1
+#     readonly_fields = ["original_name", "uploaded_at", "file_link", "owner"]
 
 
 class DocumentInline(admin.TabularInline):
@@ -207,6 +218,11 @@ class DocumentAdmin(admin.ModelAdmin):
     show_full_result_count = True
     extra = 0
 
+    class Media:
+        css = {
+            "all": ("/static/admin/css/custom.css",)
+        }
+
     def has_add_permission(self, request, obj=None):
         """Запрет добавлять элементы вручную"""
         return False
@@ -342,7 +358,7 @@ class QueueItemInline(admin.TabularInline):
         "temp_file_answer",
         "document_actions",
     )
-    inlines = [DocumentFileInline]
+    # inlines = [DocumentFileInline]
     readonly_fields = [
         "id",
         "position",
@@ -746,6 +762,11 @@ class QueueItemAdmin(admin.ModelAdmin):
     list_max_show_all = 100
     show_full_result_count = True
     extra = 0
+
+    class Media:
+        css = {
+            "all": ("/static/admin/css/custom.css",)
+        }
 
     def get_queryset(self, request):
         """Показываем только документы со статусом 'pending'"""

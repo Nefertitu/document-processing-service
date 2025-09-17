@@ -18,7 +18,7 @@ services:
       - POSTGRES_PORT=5432
     volumes:
       - static_volume:/app/staticfiles
-      - ./media:/app/media
+      - ./media_volume:/app/media
       - .:/app
     working_dir: /app
     ports:
@@ -47,9 +47,8 @@ services:
     ports:
       - "80:80"
     volumes:
-#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - static_volume:/app/staticfiles
-      - ./media:/app/media
+      - ./media_volume:/app/media
     depends_on:
       web:
         condition: service_healthy
@@ -119,3 +118,4 @@ volumes:
   redis_data:
   celery_beat_volume:
   static_volume:
+  media_volume:
