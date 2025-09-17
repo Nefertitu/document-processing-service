@@ -30,7 +30,7 @@ services:
     user: appuser
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
 #      test: [ "CMD-SHELL", "exit 0" ]
       interval: 30s
       timeout: 20s
