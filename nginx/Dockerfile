@@ -8,8 +8,6 @@ RUN mkdir -p /app/staticfiles && \
 
 RUN mkdir -p /app/media
 
-RUN rm -f /etc/nginx/conf.d/default.conf
-
 COPY nginx.conf /etc/nginx/nginx.conf
 
 EXPOSE 80
