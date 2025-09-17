@@ -24,14 +24,17 @@ RUN poetry config virtualenvs.create false && \
 
 COPY . .
 
+RUN mkdir -p /app/media/documents /app/media/temp_uploads /app/media/temp_answers
+RUN mkdir -p /app/static /app/staticfiles
+RUN chmod -R 755 /app/media /app/static /app/staticfiles
+
 RUN adduser --disabled-password --gecos '' appuser
+RUN chown -R appuser:appuser /app
 
 COPY docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh
 
 RUN rm -rf ~/.cache/pip
-
-RUN chown -R appuser:appuser /app
 
 USER appuser
 
