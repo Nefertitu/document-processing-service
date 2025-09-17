@@ -48,8 +48,9 @@ services:
       - static_volume:/app/staticfiles
       - ./media_volume:/app/media
     depends_on:
-      web:
-        condition: service_healthy
+      - web
+#      web:
+#        condition: service_healthy
     restart: unless-stopped
 
   db:
