@@ -46,7 +46,7 @@ services:
       - "80:80"
     volumes:
       - static_volume:/app/staticfiles
-      - ./media_volume:/app/media
+      - media_volume:/app/media
     depends_on:
       - web
 #      web:
@@ -87,7 +87,7 @@ services:
     env_file: .env
     volumes:
       - .:/app
-      - ./media:/app/media
+      - media:/app/media
     depends_on:
       - db
       - redis
@@ -103,7 +103,7 @@ services:
     env_file: .env
     volumes:
       - .:/app
-      - ./media:/app/media
+      - media:/app/media
       - celery_beat_volume:/var/celerybeat-schedule
     depends_on:
       - db
