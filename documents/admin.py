@@ -169,7 +169,7 @@ class FolderAdmin(admin.ModelAdmin):
     # documents_count.admin_order_field = "pending_count"
 
 
-# @admin.register(Document)
+@admin.register(Document)
 class DocumentAdmin(CustomModelAdmin):
     """Администрирование документов. Позволяет управлять
     документами, с возможностью фильтрации и поиска."""
