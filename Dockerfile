@@ -26,9 +26,8 @@ COPY . .
 
 RUN adduser --disabled-password --gecos '' appuser
 
-RUN mkdir -p /app/static /app/staticfiles /app/media /var/celerybeat-schedule && \
-    chown -R appuser:appuser /app/static /app/staticfiles /app/media /var/celerybeat-schedule && \
-    chmod -R 775 /app/static /app/staticfiles /app/media /var/celerybeat-schedule
+COPY docker-entrypoint.sh /
+RUN chmod +x /docker-entrypoint.sh
 
 RUN rm -rf ~/.cache/pip
 
@@ -36,4 +35,5 @@ USER appuser
 
 EXPOSE 8000
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
