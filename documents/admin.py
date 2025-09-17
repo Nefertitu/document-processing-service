@@ -16,7 +16,7 @@ from .services import DocumentService, QueueService, get_next_available_admin
 from .tasks import send_single_document_email
 
 
-class CustomModelAdmin(AdminSite):
+class CustomModelAdmin(admin.ModelAdmin):
     """Кастомный класс для добавления стиля моделям админки"""
 
     class Media:
@@ -169,7 +169,7 @@ class FolderAdmin(admin.ModelAdmin):
     # documents_count.admin_order_field = "pending_count"
 
 
-@admin.register(Document)
+# @admin.register(Document)
 class DocumentAdmin(CustomModelAdmin):
     """Администрирование документов. Позволяет управлять
     документами, с возможностью фильтрации и поиска."""
