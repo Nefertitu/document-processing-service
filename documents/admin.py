@@ -1,6 +1,7 @@
 import os
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin import AdminSite
 from django.contrib.auth.models import User
 from django.db.models import Case, Count, IntegerField, Q, QuerySet, When
 from django.http import HttpRequest, HttpResponseRedirect
@@ -18,9 +19,7 @@ from .tasks import send_single_document_email
 class CustomAdminSite(AdminSite):
     def each_context(self, request):
         context = super().each_context(request)
-        context["css"] = {
-            "custom": "/static/admin/css/custom.css"
-        }
+        context["css"] = {"custom": "/static/admin/css/custom.css"}
         return context
 
 
@@ -219,9 +218,7 @@ class DocumentAdmin(admin.ModelAdmin):
     extra = 0
 
     class Media:
-        css = {
-            "all": ("/static/admin/css/custom.css",)
-        }
+        css = {"all": ("/static/admin/css/custom.css",)}
 
     def has_add_permission(self, request, obj=None):
         """Запрет добавлять элементы вручную"""
@@ -764,9 +761,7 @@ class QueueItemAdmin(admin.ModelAdmin):
     extra = 0
 
     class Media:
-        css = {
-            "all": ("/static/admin/css/custom.css",)
-        }
+        css = {"all": ("/static/admin/css/custom.css",)}
 
     def get_queryset(self, request):
         """Показываем только документы со статусом 'pending'"""
