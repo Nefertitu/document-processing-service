@@ -87,7 +87,7 @@ services:
     env_file: .env
     volumes:
       - .:/app
-      - media:/app/media
+      - media_volume:/app/media
     depends_on:
       - db
       - redis
@@ -103,7 +103,7 @@ services:
     env_file: .env
     volumes:
       - .:/app
-      - media:/app/media
+      - media_volume:/app/media
       - celery_beat_volume:/var/celerybeat-schedule
     depends_on:
       - db
