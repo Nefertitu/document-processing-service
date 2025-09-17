@@ -17,13 +17,14 @@ from .tasks import send_single_document_email
 
 
 class CustomAdminSite(AdminSite):
-    def each_context(self, request):
-        context = super().each_context(request)
-        context["css"] = {"custom": "/static/admin/css/custom.css"}
-        return context
+    """Кастомный класс для добавления стиля моделям админки"""
+
+    class Media:
+        css = {
+            "all": ("admin/css/custom.css",)
+        }
 
 
-#
 # class DocumentFileInline(admin.TabularInline):
 #     """'InLine' для отображения файлов внутри элементов очереди"""
 #     model = DocumentFile
@@ -169,7 +170,7 @@ class FolderAdmin(admin.ModelAdmin):
 
 
 @admin.register(Document)
-class DocumentAdmin(admin.ModelAdmin):
+class DocumentAdmin(CustomModelAdmin):
     """Администрирование документов. Позволяет управлять
     документами, с возможностью фильтрации и поиска."""
 
@@ -187,7 +188,6 @@ class DocumentAdmin(admin.ModelAdmin):
         "review_comment",
         "get_reviewed_by",
         "get_file_answer",
-        "file_answer",
     )
 
     list_filter = ("status",)
@@ -209,7 +209,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "reviewed_by",
         "reviewed_at",
         "review_comment",
-        "file_answer",
+        "get_file_answer",
     ]
 
     list_per_page = 10
@@ -254,8 +254,8 @@ class DocumentAdmin(admin.ModelAdmin):
         """Отображает ответный файл документа"""
 
         if obj.file_answer:
-            return get_file_answer_display(obj.file_answer)
-        return "Документ не найден"
+            return get_file_answer_display(obj.file_answer.file)
+        return "Документ отсутствует"
 
     get_file_answer.short_description = "Ответный файл администратора 📌"
     get_file_answer.allow_tags = True
