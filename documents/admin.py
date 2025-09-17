@@ -16,7 +16,7 @@ from .services import DocumentService, QueueService, get_next_available_admin
 from .tasks import send_single_document_email
 
 
-class CustomAdminSite(AdminSite):
+class CustomModelAdmin(AdminSite):
     """Кастомный класс для добавления стиля моделям админки"""
 
     class Media:
