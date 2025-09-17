@@ -169,7 +169,10 @@ if CACHE_ENABLED:
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": os.getenv("LOCATION"),
             "TIMEOUT": 300,
-            "KEY_PREFIX": "mailing_service",
+            # "KEY_PREFIX": "document_service",
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            }
         }
     }
 
