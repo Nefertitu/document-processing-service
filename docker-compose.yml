@@ -16,7 +16,7 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
-#      - .:/app
+      - .:/app
     working_dir: /app
     ports:
       - "8000:8000"
