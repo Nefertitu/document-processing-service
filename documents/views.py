@@ -1,13 +1,16 @@
 import os
-from typing import Any, Sequence, Union
+from typing import Any, Sequence, Union, Type
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, QuerySet
 from django.http import FileResponse, HttpResponseForbidden
+from django.http import Http404
 from django_filters.rest_framework import DjangoFilterBackend
+
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework import permissions, status, viewsets
+from rest_framework.serializers import BaseSerializer
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.permissions import BasePermission, IsAdminUser, IsAuthenticated, OperandHolder, SingleOperandHolder
@@ -27,6 +30,7 @@ from .serializers import (
     QueueItemSerializer,
 )
 from .services import DocumentHeavyProcessingService, DocumentService, QueueService, setup_task_archive_old_documents
+from .serializers import FolderSerializer
 from .tasks import send_single_document_email
 
 
@@ -38,7 +42,7 @@ class FolderViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]
     permission_classes = [permissions.IsAdminUser]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Folder]:
         """Получаем базовый queryset папок"""
 
         queryset = Folder.objects.all()
@@ -88,7 +92,7 @@ class FolderViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Type[FolderSerializer]:
         """Возвращает класс сериализатора"""
         return FolderSerializer
 
@@ -293,11 +297,11 @@ class ApprovalQueueViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Type[serializers.BaseSerializer]:
         """Возвращает класс сериализатора"""
         return ApprovalQueueSerializer
 
-    def create(self, request, *args: Any, **kwargs: Any):
+    def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Только суперпользователь и админы могут создавать очереди"""
 
         try:
@@ -317,14 +321,14 @@ class ApprovalQueueViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({"error": f"Не удалось создать очередь: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-    def list(self, request, *args, **kwargs):
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Возвращает список очередей в зависимости от прав"""
 
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    def destroy(self, request, *args, **kwargs):
+    def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Удаление очереди.
         Суперпользователь и админы могут удалить только пустую очередь.
@@ -356,7 +360,7 @@ class ApprovalQueueViewSet(viewsets.ModelViewSet):
 class QueueItemViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с документами в очереди"""
 
-    permission_classes = [IsOwnerOrAdmin, CanApproveDocument, CanRejectDocument]
+    permission_classes = [IsOwnerOrAdmin]
     serializer_class = QueueItemSerializer
     pagination_class = QueueItemPaginator
     queryset = QueueItem.objects.all()
@@ -390,7 +394,7 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         # print(f"📋 Documents owned by user: {list(own_docs.values_list('id', 'document'))}")
         return own_docs
 
-    def get_object(self):
+    def get_object(self) -> QueueItem:
         """ Получает объект QueueItem и проверяет права доступа пользователя"""
 
         try:
@@ -407,7 +411,7 @@ class QueueItemViewSet(viewsets.ModelViewSet):
             return obj
         except QueueItem.DoesNotExist:
             print("❌ Объект не найден")
-            raise
+            raise Http404("Элемент очереди не существует")
         except Exception as e:
             print(f"❌ Ошибка: {e}")
             raise
@@ -494,7 +498,7 @@ class DocumentFileViewSet(viewsets.ModelViewSet):
     ordering_fields = ["uploaded_at", "file__size"]
     ordering = ["-uploaded_at"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[DocumentFile]:
         """Возвращает 'queryset' в зависимости от прав"""
 
         user = self.request.user
@@ -506,6 +510,6 @@ class DocumentFileViewSet(viewsets.ModelViewSet):
         else:
             return DocumentFile.objects.filter(owner=user)
 
-    def perform_create(self, serializer):
+    def perform_create(self, serializer) -> None:
         """Автоматическая привязка к пользователю"""
         serializer.save(owner=self.request.user)
