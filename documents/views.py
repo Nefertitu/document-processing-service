@@ -10,7 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework import permissions, status, viewsets
-from rest_framework.serializers import BaseSerializer
+from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.permissions import BasePermission, IsAdminUser, IsAuthenticated, OperandHolder, SingleOperandHolder
