@@ -206,12 +206,12 @@ class DocumentAdmin(CustomModelAdmin):
         "folder",
         "description",
         "uploaded_at",
-        "reviewed_by",
+        "get_reviewed_by",
         "reviewed_at",
         "review_comment",
         "get_file_answer",
     ]
-
+    exclude = ["file_answer", "reviewed_by"]
     list_per_page = 10
     list_max_show_all = 100
     show_full_result_count = True
