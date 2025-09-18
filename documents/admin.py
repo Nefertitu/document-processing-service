@@ -261,6 +261,18 @@ class DocumentAdmin(CustomModelAdmin):
         """Разрешение на изменение только своих документов или 'superuser'"""
         return request.user.is_superuser
 
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        """Скрываем стандартные кнопки в админке"""
+
+        extra_context = extra_context or {}
+        extra_context["show_save"] = False
+        extra_context["show_delete"] = False
+        extra_context["show_save_and_continue"] = False
+        extra_context["show_save_and_add_another"] = False
+        extra_context["show_close"] = True
+
+        return super().change_view(request, object_id, form_url, extra_context)
+
     def add_view(self, request, form_url="", extra_context=None):
         """Перенаправление при попытке доступа к добавлению"""
         return HttpResponseRedirect(reverse("admin:documents_document_changelist"))
