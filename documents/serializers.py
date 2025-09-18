@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, Any, Dict
 
 from django.conf import settings
 from django.db.models import Count
@@ -88,7 +88,7 @@ class BaseDocumentSerializer(serializers.ModelSerializer):
     owner_info = serializers.SerializerMethodField()
     file_url = serializers.SerializerMethodField()
 
-    def get_owner_info(self, obj):
+    def get_owner_info(self, obj: Document) -> dict:
         """Возвращает данные о создателе документа"""
 
         if obj.owner:
@@ -97,14 +97,14 @@ class BaseDocumentSerializer(serializers.ModelSerializer):
                 "full_name": obj.owner.get_full_name(),
             }
 
-    def get_serializer_context(self):
+    def get_serializer_context(self) -> Dict[str, Any]:
         """Добавляем request в контекст сериализатора"""
 
         context = super().get_serializer_context()
         context["request"] = self.request
         return context
 
-    def get_file_url(self, obj):
+    def get_file_url(self, obj: Document) -> str | None:
         """Возвращает абсолютный путь до файла"""
 
         try:
@@ -160,21 +160,21 @@ class DocumentSerializer(BaseDocumentSerializer):
     folder = serializers.SlugRelatedField(slug_field="slug", read_only=True)
     show_review_details = serializers.SerializerMethodField()
 
-    def get_assigned_admin_info(self, obj):
+    def get_assigned_admin_info(self, obj: Document) -> dict | None:
         """Добавляет информацию об ответственном администраторе"""
 
         if obj.assigned_admin:
             return {"email": obj.assigned_admin.email, "full_name": obj.assigned_admin.get_full_name()}
         return None
 
-    def get_reviewed_by_info(self, obj):
+    def get_reviewed_by_info(self, obj: Document) -> dict | None:
         """Добавляет информацию о проверившем администраторе"""
 
         if obj.reviewed_by:
             return {"email": obj.reviewed_by.email, "full_name": obj.reviewed_by.get_full_name()}
         return None
 
-    def get_show_review_details(self, obj):
+    def get_show_review_details(self, obj: Document) -> str:
         """Определяет, нужно ли показывать детали ревью пользователю"""
         return obj.status in ["approved", "rejected"]
 
@@ -207,7 +207,7 @@ class DocumentSerializer(BaseDocumentSerializer):
         ]
         validators = [TitleValidator(field="title")]
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: Document) -> Dict[str, Any]:
         """Переопределяем представление для условного отображения полей"""
 
         representation = super().to_representation(instance)
@@ -219,7 +219,7 @@ class DocumentSerializer(BaseDocumentSerializer):
 
         return representation
 
-    def update(self, instance, validated_data):
+    def update(self, instance, validated_data: Dict[str, Any]) -> Document:
         """Пользователи не могут обновлять документы через этот сериализатор"""
         raise serializers.ValidationError("Пользователи не могут редактировать документы после загрузки")
 
@@ -237,7 +237,7 @@ class DocumentAdminSerializer(BaseDocumentSerializer):
     )
     file_url = serializers.SerializerMethodField()
 
-    def get_assigned_admin_info(self, obj):
+    def get_assigned_admin_info(self, obj: Document) -> dict:
         """Добавляет информацию об администраторе"""
 
         if obj.assigned_admin:
@@ -291,7 +291,7 @@ class ApprovalQueueSerializer(serializers.ModelSerializer):
         fields = ["id", "title", "approver_info", "created_at", "documents_in_queue", "count_documents_in_queue"]
         validators = [TitleValidator(field="title")]
 
-    def get_count_documents_in_queue(self, obj):
+    def get_count_documents_in_queue(self, obj: ApprovalQueue) -> int:
         """Возвращает количество документов в очереди"""
 
         request = self.context.get("request")
@@ -309,7 +309,7 @@ class ApprovalQueueSerializer(serializers.ModelSerializer):
 
         return obj.items.filter(document__owner=request.user).count()
 
-    def get_documents_in_queue(self, obj):
+    def get_documents_in_queue(self, obj: ApprovalQueue) -> dict:
         """Возвращает список документов в очереди"""
 
         documents_in_queue = Document.objects.filter(queue_items__queue_id=obj.pk)
@@ -338,7 +338,7 @@ class ApprovalQueueSerializer(serializers.ModelSerializer):
             }
             return data
 
-    def get_approver_info(self, obj):
+    def get_approver_info(self, obj: ApprovalQueue) -> dict:
         """Возвращает данные об ответственном администраторе"""
 
         return {
@@ -367,11 +367,11 @@ class QueueItemSerializer(serializers.ModelSerializer):
             "temp_file_answer",
         ]
 
-    def get_document_title(self, obj):
+    def get_document_title(self, obj: QueueItem) -> str:
         """Возвращает данные о наименовании документа"""
         return obj.document.title
 
-    def get_approval_queue_title(self, obj):
+    def get_approval_queue_title(self, obj: QueueItem) -> str:
         """Возвращает название очереди"""
         return obj.queue.title
 
@@ -385,7 +385,7 @@ class DocumentFileSerializer(serializers.ModelSerializer):
         read_only_fields = ["owner", "uploaded_at", "original_name"]
         validators = [DocumentFileValidator()]
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict) -> DocumentFile:
         """Автоматически устанавливается 'owner' и 'original_name'"""
 
         request = self.context.get("request")

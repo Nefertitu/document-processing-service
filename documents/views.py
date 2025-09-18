@@ -30,7 +30,6 @@ from .serializers import (
     QueueItemSerializer,
 )
 from .services import DocumentHeavyProcessingService, DocumentService, QueueService, setup_task_archive_old_documents
-from .serializers import FolderSerializer
 from .tasks import send_single_document_email
 
 
@@ -395,7 +394,7 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         return own_docs
 
     def get_object(self) -> QueueItem:
-        """ Получает объект QueueItem и проверяет права доступа пользователя"""
+        """Получает объект QueueItem и проверяет права доступа пользователя"""
 
         try:
             obj = QueueItem.objects.get(pk=self.kwargs.get("pk"))
