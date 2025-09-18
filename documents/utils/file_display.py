@@ -122,7 +122,6 @@ def get_file_answer_display(document_file):
     try:
 
         file_name = document_file.name.split("/")[-1]
-        original_name = getattr(document_file, "original_name", file_name)
 
         file_extension = file_name.split(".")[-1].lower() if "." in file_name else "file"
 
