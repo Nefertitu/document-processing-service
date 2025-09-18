@@ -207,6 +207,14 @@ newgrp docker
 - POSTGRES_PORT - 5432
 - POSTGRES_SUPERUSER_PASSWORD - postgres
 
+Внесите настройки Вашего SMTP-сервера:
+- EMAIL_HOST
+- EMAIL_PORT
+- EMAIL_USE_TLS
+- EMAIL_USE_SSL
+- EMAIL_HOST_USER
+- EMAIL_HOST_PASSWORD
+
 5. Создание суперпользователя:
 
 * Данные по умолчанию:
