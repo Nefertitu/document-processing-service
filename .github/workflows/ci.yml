@@ -252,6 +252,7 @@ jobs:
           echo "CELERY_BROKER_URL=redis://redis:6379/1" >> /opt/document_service/.env
           echo "CELERY_RESULT_BACKEND=redis://redis:6379/1" >> /opt/document_service/.env
           echo "DEBUG=False" >> /opt/document_service/.env
+          echo "SERVER_IP=${{ secrets.SERVER_IP }}" >> /opt/document_service/.env
           echo "ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}"  >> /opt/document_service/.env
           
           docker-compose down
