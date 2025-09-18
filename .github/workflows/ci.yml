@@ -227,6 +227,9 @@ jobs:
           set -e
           cd /opt/document_service || { echo 'Error: Directory not found'; exit 1; }
           [ -f docker-compose.yml ] || { echo 'Error: docker-compose.yml not found'; ls -la; exit 1; }
+          
+          > /opt/document_service/.env
+          
           echo 'POSTGRES_USER=${{ secrets.POSTGRES_USER }}' >> /opt/document_service/.env
           echo 'SUPERUSER_EMAIL=${{ secrets.SUPERUSER_EMAIL }}' >> /opt/document_service/.env
           echo 'SUPERUSER_PASSWORD=${{ secrets.SUPERUSER_PASSWORD }}' >> /opt/document_service/.env
@@ -248,8 +251,9 @@ jobs:
           echo "EMAIL_USE_TLS=${{ secrets.EMAIL_USE_TLS }}" >> /opt/document_service/.env
           echo "CELERY_BROKER_URL=redis://redis:6379/1" >> /opt/document_service/.env
           echo "CELERY_RESULT_BACKEND=redis://redis:6379/1" >> /opt/document_service/.env
-          DEBUG=False
-          echo 'ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}' >> /opt/document_service/.env
+          echo "DEBUG=False" >> /opt/document_service/.env
+          echo "ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}"  >> /opt/document_service/.env
+          
           docker-compose down
           docker-compose up -d --build
           docker ps -a
