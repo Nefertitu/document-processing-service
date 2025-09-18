@@ -240,6 +240,12 @@ jobs:
           echo 'POSTGRES_SUPERUSER_PASSWORD=${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}' >> /opt/document_service/.env
           echo "POSTGRES_HOST=db" >> /opt/document_service/.env
           echo "POSTGRES_PORT=5432" >> /opt/document_service/.env
+          echo "EMAIL_HOST=${{ secrets.EMAIL_HOST }}" >> /opt/document_service/.env
+          echo "EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}" >> /opt/document_service/.env
+          echo "EMAIL_HOST_USER=${{ secrets.EMAIL_HOST_USER }}" >> /opt/document_service/.env
+          echo "EMAIL_PORT=${{ secrets.EMAIL_PORT }}" >> /opt/document_service/.env
+          echo "EMAIL_USE_SSL=${{ secrets.EMAIL_USE_SSL }}" >> /opt/document_service/.env
+          echo "EMAIL_USE_TLS=${{ secrets.EMAIL_USE_TLS }}" >> /opt/document_service/.env
           echo "CELERY_BROKER_URL=redis://redis:6379/1" >> /opt/document_service/.env
           echo "CELERY_RESULT_BACKEND=redis://redis:6379/1" >> /opt/document_service/.env
           DEBUG=False
