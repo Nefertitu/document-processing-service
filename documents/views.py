@@ -125,9 +125,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
         Фильтрует документы в зависимости от прав пользователя.
         Пользователь видит только свои документа, админ - все.
         """
-        print(f"🎯 GET_QUERYSET - Action: {self.action}, User: {self.request.user.email}")
 
         user = self.request.user
+
+        # Анонимный пользователь не может видеть документы
+        if user.is_anonymous:
+            print(f"🎯 GET_QUERYSET - Action: {self.action}, User: Anonymous")
+            raise PermissionDenied("У вас нет прав просматривать документы! Авторизуйтесь!")
+
         print(f"🔐 User: {user.email}, is_staff: {user.is_staff}, is_superuser: {user.is_superuser}")
 
         if user.is_superuser:

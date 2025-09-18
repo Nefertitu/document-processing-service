@@ -118,16 +118,19 @@ class DocumentTestCase(APITestCase):
         url = reverse("documents:document-detail", kwargs={"pk": self.document.pk})
         response = self.client.get(url)
         print(f"👤 Владелец - Status: {response.status_code}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Проверяем доступ админа
         self.client.force_authenticate(user=self.admin)
         response = self.client.get(url)
         print(f"👨‍💼 Админ - Status: {response.status_code}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Проверяем доступ анонимного пользователя
         self.client.logout()
         response = self.client.get(url)
         print(f"👻 Аноним - Status: {response.status_code}")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_documents_list(self) -> None:
         """Тест списка документов"""
