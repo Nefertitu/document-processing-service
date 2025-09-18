@@ -229,7 +229,7 @@ sudo chmod -R 775 /opt/document_service/media
 ```
 7. Для подключения стилей в админке выполнить в терминале сервера:
 ```
-python manage.py collectstatic --noinput
+docker-compose exec web python manage.py collectstatic --noinput
 ```
 
 8. Проверка работоспособности:

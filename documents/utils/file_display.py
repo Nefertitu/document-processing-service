@@ -172,7 +172,7 @@ def get_file_answer_display(document_file):
             "</div>",
             file_url,
             file_url,
-            original_name,
+            # original_name,
             icon,
             file_extension.upper(),
             size_str,

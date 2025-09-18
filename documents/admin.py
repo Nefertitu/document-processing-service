@@ -181,6 +181,8 @@ class DocumentAdmin(CustomModelAdmin):
         "get_all_files_links",
         "owner",
         "assigned_admin",
+        "folder",
+        "description",
         "uploaded_at",
         "reviewed_at",
         "review_comment",
