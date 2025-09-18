@@ -25,6 +25,8 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
         user = document.owner
         comment = document.review_comment
 
+        if document.status == "pending":
+            print(f"Попытка отправки email на адрес: {settings.DEFAULT_FROM_EMAIL}")
         print(f"Попытка отправки email на: {user.email}")
         print(f"От: {settings.DEFAULT_FROM_EMAIL}")
         print(f"Тема: {document.title}")
