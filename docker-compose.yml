@@ -99,7 +99,7 @@ services:
 
   celery-beat:
     build: .
-    command: poetry run celery -A config beat --scheduler django_celery_beat.schedulers:DatabaseScheduler -s /var/celerybeat-schedule/celerybeat-schedule --loglevel=info
+    command: poetry run celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file: .env
     volumes:
       - .:/app

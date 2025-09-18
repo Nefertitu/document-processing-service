@@ -16,13 +16,6 @@ from .services import DocumentService, QueueService, get_next_available_admin
 from .tasks import send_single_document_email
 
 
-class CustomModelAdmin(admin.ModelAdmin):
-    """Кастомный класс для добавления стиля моделям админки"""
-
-    class Media:
-        css = {"all": ("admin/css/custom.css",)}
-
-
 # class DocumentFileInline(admin.TabularInline):
 #     """'InLine' для отображения файлов внутри элементов очереди"""
 #     model = DocumentFile
@@ -168,7 +161,7 @@ class FolderAdmin(admin.ModelAdmin):
 
 
 @admin.register(Document)
-class DocumentAdmin(CustomModelAdmin):
+class DocumentAdmin(admin.ModelAdmin):
     """Администрирование документов. Позволяет управлять
     документами, с возможностью фильтрации и поиска."""
 
