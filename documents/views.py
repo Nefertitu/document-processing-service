@@ -129,8 +129,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         # Анонимный пользователь не может видеть документы
-        if user.is_anonymous:
-            print(f"🎯 GET_QUERYSET - Action: {self.action}, User: Anonymous")
+        if not user.is_authenticated:
+            print(f"🎯 GET_QUERYSET - Action: {self.action}, User: not Authenticated")
             raise PermissionDenied("У вас нет прав просматривать документы! Авторизуйтесь!")
 
         print(f"🔐 User: {user.email}, is_staff: {user.is_staff}, is_superuser: {user.is_superuser}")
