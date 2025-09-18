@@ -160,7 +160,6 @@ class DocumentSerializer(BaseDocumentSerializer):
     folder = serializers.SlugRelatedField(slug_field="slug", read_only=True)
     show_review_details = serializers.SerializerMethodField()
 
-
     def get_assigned_admin_info(self, obj):
         """Добавляет информацию об ответственном администраторе"""
 
@@ -175,11 +174,9 @@ class DocumentSerializer(BaseDocumentSerializer):
             return {"email": obj.reviewed_by.email, "full_name": obj.reviewed_by.get_full_name()}
         return None
 
-
     def get_show_review_details(self, obj):
         """Определяет, нужно ли показывать детали ревью пользователю"""
         return obj.status in ["approved", "rejected"]
-
 
     class Meta:
         model = Document
@@ -196,11 +193,17 @@ class DocumentSerializer(BaseDocumentSerializer):
             "review_comment",
             "reviewed_at",
             "folder",
-            "show_review_details"
+            "show_review_details",
         ]
         read_only_fields = [
-            "status", "uploaded_at", "owner_info", "assigned_admin_info",
-            "reviewed_by_info", "folder", "review_comment", "reviewed_at"
+            "status",
+            "uploaded_at",
+            "owner_info",
+            "assigned_admin_info",
+            "reviewed_by_info",
+            "folder",
+            "review_comment",
+            "reviewed_at",
         ]
         validators = [TitleValidator(field="title")]
 
@@ -219,6 +222,7 @@ class DocumentSerializer(BaseDocumentSerializer):
     def update(self, instance, validated_data):
         """Пользователи не могут обновлять документы через этот сериализатор"""
         raise serializers.ValidationError("Пользователи не могут редактировать документы после загрузки")
+
 
 class DocumentAdminSerializer(BaseDocumentSerializer):
     """
@@ -354,8 +358,13 @@ class QueueItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = QueueItem
         fields = [
-            "id", "document_title", "approval_queue_title", "position",
-            "added_at", "temp_review_comment", "temp_file_answer"
+            "id",
+            "document_title",
+            "approval_queue_title",
+            "position",
+            "added_at",
+            "temp_review_comment",
+            "temp_file_answer",
         ]
 
     def get_document_title(self, obj):

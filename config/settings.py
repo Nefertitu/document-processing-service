@@ -172,7 +172,7 @@ if CACHE_ENABLED:
             # "KEY_PREFIX": "document_service",
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            }
+            },
         }
     }
 

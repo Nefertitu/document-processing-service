@@ -20,9 +20,7 @@ class CustomModelAdmin(admin.ModelAdmin):
     """Кастомный класс для добавления стиля моделям админки"""
 
     class Media:
-        css = {
-            "all": ("admin/css/custom.css",)
-        }
+        css = {"all": ("admin/css/custom.css",)}
 
 
 # class DocumentFileInline(admin.TabularInline):
