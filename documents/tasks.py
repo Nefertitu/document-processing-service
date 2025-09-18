@@ -6,6 +6,7 @@ from celery import shared_task
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.mail import send_mail
+from django.core.mail import EmailMessage
 from django.db.models import Q
 from django.utils import timezone
 from PIL import Image
@@ -22,6 +23,7 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
 
     try:
         document = Document.objects.get(id=document_id)
+        print(f"🎯 START: Задача отправки сообщения о документе: {document.pk} {document.title} {document.status}")
         user = document.owner
         comment = document.review_comment
 
@@ -44,6 +46,7 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
                 recipient_list=[document.assigned_admin.email],
                 fail_silently=False,
             )
+
             print(f"Результат отправки: {result}")
 
         elif status == "approved":
@@ -53,13 +56,20 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
             if comment:
                 message += f"\nКомментарий: {comment}"
 
-            result = send_mail(
+            email = EmailMessage(
                 subject=subject,
-                message=message,
-                from_email=os.getenv("EMAIL_HOST_USER"),
-                recipient_list=[document.owner.email],
-                fail_silently=False,
+                body=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[document.owner.email],
             )
+
+            if document.file_answer:
+                try:
+                    email.attach_file(document.file_answer.path)
+                except FileNotFoundError:
+                    print("Ответный файл не найден на диске!")
+
+            result = email.send()
             print(
                 f"Подтвержден документ: {document.title}, уведомление отправлено на почту пользователю {document.owner.email}"
             )
@@ -72,13 +82,20 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
             if comment:
                 message += f"\nКомментарий: {comment}"
 
-            result = send_mail(
+            email = EmailMessage(
                 subject=subject,
-                message=message,
-                from_email=os.getenv("EMAIL_HOST_USER"),
-                recipient_list=[document.owner.email],
-                fail_silently=False,
+                body=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[document.owner.email],
             )
+
+            if document.file_answer:
+                try:
+                    email.attach_file(document.file_answer.path)
+                except FileNotFoundError:
+                    print("Ответный файл не найден на диске!")
+
+            result = email.send()
             print(f"Результат отправки: {result}")
             print(f"Отправлено уведомление пользователю {user.email} о статусе документа: {status}")
             print(

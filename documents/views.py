@@ -235,22 +235,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
             raise Http404("Файл не найден")
 
-    # def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-    #     """Обновление документа доступно только его владельцу"""
-    #
-    #     instance = self.get_object()
-    #
-    #     partial = kwargs.pop("partial", False)
-    #     serializer = self.get_serializer(
-    #         instance,
-    #         data=request.data,
-    #         partial=partial,
-    #     )
-    #     serializer.is_valid(raise_exception=True)
-    #     self.perform_update(serializer)
-    #
-    #     return Response(serializer.data)
-
     def perform_update(self, serializer):
         """Если есть комментарий или файл ответа, но нет проверяющего администратора"""
 

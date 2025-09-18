@@ -808,8 +808,8 @@ class SendInformationTaskTest(APITestCase):
         self.assertEqual(kwargs.get("from_email"), os.getenv("EMAIL_HOST_USER"))
         self.assertEqual(kwargs.get("recipient_list"), [self.admin.email])
 
-    @patch("documents.tasks.send_mail")
-    def test_send_information_success_status_approved(self, mock_send_mail):
+    @patch("documents.tasks.EmailMessage")
+    def test_send_information_success_status_approved(self, mock_email_message):
         """
         Тест успешной отправки сообщения о получении
         документом статуса одобренного на 'email' пользователю
@@ -817,48 +817,46 @@ class SendInformationTaskTest(APITestCase):
 
         send_single_document_email(document_id=self.document.pk, status="approved", comment="")
 
-        mock_send_mail.assert_called_once_with(
+        mock_email_message.assert_called_once_with(
             subject="✅ Ваш документ подтвержден!",
-            message=f"Документ '{self.document.title}' был подтвержден.",
-            from_email=os.getenv("EMAIL_HOST_USER"),
-            recipient_list=[self.user.email],
-            fail_silently=False,
+            body=f"Документ '{self.document.title}' был подтвержден.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[self.user.email],
         )
 
-        args, kwargs = mock_send_mail.call_args
+        args, kwargs = mock_email_message.call_args
 
         self.assertEqual(kwargs.get("subject"), "✅ Ваш документ подтвержден!")
 
-        message = kwargs.get("message", "")
+        message = kwargs.get("body", "")
         self.assertIn(f"Документ '{self.document.title}' был подтвержден.", message)
-        self.assertEqual(kwargs.get("from_email"), os.getenv("EMAIL_HOST_USER"))
-        self.assertEqual(kwargs.get("recipient_list"), [self.user.email])
+        self.assertEqual(kwargs.get("from_email"), settings.DEFAULT_FROM_EMAIL)
+        self.assertEqual(kwargs.get("to"), [self.user.email])
 
-    @patch("documents.tasks.send_mail")
-    def test_send_information_success_status_rejected(self, mock_send_mail):
+    @patch("documents.tasks.EmailMessage")
+    def test_send_information_success_status_rejected(self, mock_email_message):
         """
-        Тест успешной отправки сообщения о получении
-        документом статуса одобренного на 'email' пользователю
+        Тест отправки сообщения о получении
+        документом статуса 'отклонен' на 'email' пользователю
         """
 
         send_single_document_email(document_id=self.document.pk, status="rejected", comment="")
 
-        mock_send_mail.assert_called_once_with(
+        mock_email_message.assert_called_once_with(
             subject="❌ Ваш документ отклонен!",
-            message=f"Документ '{self.document.title}' был отклонен.",
-            from_email=os.getenv("EMAIL_HOST_USER"),
-            recipient_list=[self.user.email],
-            fail_silently=False,
+            body=f"Документ '{self.document.title}' был отклонен.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[self.user.email],
         )
 
-        args, kwargs = mock_send_mail.call_args
+        args, kwargs = mock_email_message.call_args
 
         self.assertEqual(kwargs.get("subject"), "❌ Ваш документ отклонен!")
 
-        message = kwargs.get("message", "")
+        message = kwargs.get("body", "")
         self.assertIn(f"Документ '{self.document.title}' был отклонен.", message)
-        self.assertEqual(kwargs.get("from_email"), os.getenv("EMAIL_HOST_USER"))
-        self.assertEqual(kwargs.get("recipient_list"), [self.user.email])
+        self.assertEqual(kwargs.get("from_email"), settings.DEFAULT_FROM_EMAIL)
+        self.assertEqual(kwargs.get("to"), [self.user.email])
 
     @patch("documents.tasks.send_single_document_email.delay")
     def test_task_send_email_delay_called(self, mock_delay):
