@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
 ENV POETRY_HOME=/opt/poetry
 ENV POETRY_VERSION=2.2.0
 ENV PATH="$POETRY_HOME/bin:$PATH"
+ENV DJANGO_SETTINGS_MODULE=config.settings
 RUN curl -sSL https://install.python-poetry.org | python3 - --version $POETRY_VERSION
 
 WORKDIR /app

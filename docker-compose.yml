@@ -13,6 +13,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_PORT=5432
+      - DJANGO_SETTINGS_MODULE=config.settings
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
@@ -95,6 +96,7 @@ services:
     working_dir: /app
     environment:
       - C_FORCE_ROOT=false
+      - DJANGO_SETTINGS_MODULE=config.settings
     restart: unless-stopped
 
   celery-beat:
@@ -110,6 +112,8 @@ services:
       - redis
     user: appuser
     working_dir: /app
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
     restart: unless-stopped
 
 volumes:
