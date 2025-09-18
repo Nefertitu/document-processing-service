@@ -23,18 +23,14 @@ class IsOwnerOnly(permissions.BasePermission):
         return hasattr(obj, "owner") and obj.owner == request.user
 
 
-class IsOwnerOrAdmin(permissions.BasePermission):
-    """Разрешение для владельца документа или админа"""
+class IsOwnerOrReadOnly(permissions.BasePermission):
+    """Владелец может читать, админ может всё"""
 
-    def has_object_permission(self, request: Request, view: View, obj: HasOwner) -> bool:
-        """
-        Все права по работе с документами у владельца.
-        Админ может просматривать все документы.
-        """
-
-        if obj and obj.owner == request.user:
-            return True
-        return request.user.has_perm("documents.view_all_documents")
+    def has_object_permission(self, request, view, obj):
+        """Проверяет уровень доступа в зависимости от метода"""
+        if request.method in permissions.SAFE_METHODS:  # GET, HEAD, OPTIONS
+            return obj.owner == request.user or request.user.is_staff
+        return request.user.is_staff
 
 
 class CanApproveDocument(permissions.BasePermission):

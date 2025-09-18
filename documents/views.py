@@ -20,7 +20,7 @@ from rest_framework.serializers import BaseSerializer
 
 from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
 from .paginators import ApprovalItemPaginator, DocumentPaginator, QueueItemPaginator
-from .permissions import CanAccessDocumentFile, CanApproveDocument, CanRejectDocument, IsOwnerOnly, IsOwnerOrAdmin
+from .permissions import CanAccessDocumentFile, CanApproveDocument, CanRejectDocument, IsOwnerOnly, IsOwnerOrReadOnly
 from .serializers import (
     ApprovalQueueSerializer,
     DocumentAdminSerializer,
@@ -100,7 +100,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с документами"""
 
     serializer_class = DocumentSerializer
-    permission_classes = [IsOwnerOrAdmin]
     pagination_class = DocumentPaginator
     filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
     search_fields = [
@@ -162,14 +161,12 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """
 
         if self.action == "create":
-            return [permissions.IsAuthenticated()]
+            permission_classes = [IsAuthenticated]
         elif self.action in ["list", "retrieve"]:
-            return [permissions.IsAuthenticated()]
-        elif self.action in ["partial_update"]:
-            return [permissions.IsAdminUser()]
-        elif self.action == "destroy":
-            return [permissions.IsAdminUser()]
-        return [permissions.IsAuthenticated()]
+            permission_classes = [IsOwnerOrReadOnly | IsAdminUser]
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):
         """Выбираем сериализатор в зависимости от прав пользователя"""
@@ -343,10 +340,24 @@ class ApprovalQueueViewSet(viewsets.ModelViewSet):
 class QueueItemViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с документами в очереди"""
 
-    permission_classes = [IsOwnerOrAdmin]
     serializer_class = QueueItemSerializer
     pagination_class = QueueItemPaginator
     queryset = QueueItem.objects.all()
+
+    def get_permissions(self) -> Sequence[Any]:
+        """Разные права для разных действий:
+        - Отклонение/Одобрение: суперпользователь и ответственный администратор
+        - Просмотр: доступен всем
+        - Остальное: только админ или суперпользователь
+        """
+
+        if self.action in ["approve", "reject"]:
+            permission_classes = [CanApproveDocument | CanRejectDocument]
+        elif self.action in ["list", "retrieve"]:
+            permission_classes = [IsOwnerOrReadOnly | IsAdminUser]
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self) -> QuerySet[QueueItem] | None:
         """
