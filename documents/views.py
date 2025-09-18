@@ -356,7 +356,7 @@ class ApprovalQueueViewSet(viewsets.ModelViewSet):
 class QueueItemViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с документами в очереди"""
 
-    permission_classes = [CanApproveDocument, CanRejectDocument, IsAdminUser]
+    permission_classes = [IsOwnerOrAdmin, CanApproveDocument, CanRejectDocument, IsAdminUser]
     serializer_class = QueueItemSerializer
     pagination_class = QueueItemPaginator
     queryset = QueueItem.objects.all()

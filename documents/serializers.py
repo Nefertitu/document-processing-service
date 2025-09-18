@@ -158,6 +158,8 @@ class DocumentSerializer(BaseDocumentSerializer):
     assigned_admin_info = serializers.SerializerMethodField()
     reviewed_by_info = serializers.SerializerMethodField()
     folder = serializers.SlugRelatedField(slug_field="slug", read_only=True)
+    show_review_details = serializers.SerializerMethodField()
+
 
     def get_assigned_admin_info(self, obj):
         """Добавляет информацию об ответственном администраторе"""
@@ -172,6 +174,12 @@ class DocumentSerializer(BaseDocumentSerializer):
         if obj.reviewed_by:
             return {"email": obj.reviewed_by.email, "full_name": obj.reviewed_by.get_full_name()}
         return None
+
+
+    def get_show_review_details(self, obj):
+        """Определяет, нужно ли показывать детали ревью пользователю"""
+        return obj.status in ["approved", "rejected"]
+
 
     class Meta:
         model = Document
@@ -188,18 +196,29 @@ class DocumentSerializer(BaseDocumentSerializer):
             "review_comment",
             "reviewed_at",
             "folder",
+            "show_review_details"
         ]
-        read_only_fields = ["status", "uploaded_at", "owner_info", "assigned_admin_info", "reviewed_by_info", "folder"]
+        read_only_fields = [
+            "status", "uploaded_at", "owner_info", "assigned_admin_info",
+            "reviewed_by_info", "folder", "review_comment", "reviewed_at"
+        ]
         validators = [TitleValidator(field="title")]
 
+    def to_representation(self, instance):
+        """Переопределяем представление для условного отображения полей"""
+
+        representation = super().to_representation(instance)
+
+        if not self.get_show_review_details(instance):
+            representation["review_comment"] = None
+            representation["reviewed_at"] = None
+            representation["reviewed_by_info"] = None
+
+        return representation
+
     def update(self, instance, validated_data):
-        """Если есть комментарий или файл ответа, устанавливаем reviewed_by"""
-
-        if "review_comment" in validated_data or "file_answer" in validated_data:
-            validated_data["reviewed_by"] = self.context["request"].user
-
-        return super().update(instance, validated_data)
-
+        """Пользователи не могут обновлять документы через этот сериализатор"""
+        raise serializers.ValidationError("Пользователи не могут редактировать документы после загрузки")
 
 class DocumentAdminSerializer(BaseDocumentSerializer):
     """
@@ -327,9 +346,25 @@ class ApprovalQueueSerializer(serializers.ModelSerializer):
 class QueueItemSerializer(serializers.ModelSerializer):
     """Сериализатор для модели 'QueueItem'"""
 
+    document_title = serializers.SerializerMethodField()
+    approval_queue_title = serializers.SerializerMethodField()
+    temp_review_comment = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    temp_file_answer = serializers.FileField(required=False, write_only=True)
+
     class Meta:
         model = QueueItem
-        fields = ["position", "queue", "added_at", "document", "temp_review_comment", "temp_file_answer"]
+        fields = [
+            "id", "document_title", "approval_queue_title", "position",
+            "added_at", "temp_review_comment", "temp_file_answer"
+        ]
+
+    def get_document_title(self, obj):
+        """Возвращает данные о наименовании документа"""
+        return obj.document.title
+
+    def get_approval_queue_title(self, obj):
+        """Возвращает название очереди"""
+        return obj.queue.title
 
 
 class DocumentFileSerializer(serializers.ModelSerializer):

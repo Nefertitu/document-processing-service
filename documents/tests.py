@@ -488,8 +488,8 @@ class QueueItemTestCase(APITestCase):
         data = response.data
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(data.get("queue"), self.queue_item.queue.pk)
-        self.assertEqual(data.get("document"), self.queue_item.document.pk)
+        self.assertEqual(data.get("approval_queue_title"), self.queue_item.queue.title)
+        self.assertEqual(data.get("document_title"), self.queue_item.document.title)
         self.assertEqual(data.get("position"), 1)
 
     def test_document_creation_creates_queue_item(self):
@@ -539,8 +539,8 @@ class QueueItemTestCase(APITestCase):
 
         queue_items_data = data["results"][0]
         self.assertEqual(queue_items_data["position"], self.queue_item.position)
-        self.assertEqual(queue_items_data["queue"], self.approvalqueue.pk)
-        self.assertEqual(queue_items_data["document"], self.document.pk)
+        self.assertEqual(queue_items_data["approval_queue_title"], self.queue_item.queue.title)
+        self.assertEqual(queue_items_data["document_title"], self.queue_item.document.title)
 
     def test_documents_approval(self) -> None:
         """Тест одобрения документа через 'QueueItem'"""
