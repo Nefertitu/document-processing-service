@@ -145,7 +145,6 @@ class Document(models.Model):
         ordering = ["-uploaded_at"]
 
         permissions = [
-            ("view_all_documents", "Может видеть все документы"),
             ("can_approve_document", "Может подтверждать документы"),
             ("can_reject_document", "Может отклонять документы"),
         ]

@@ -124,17 +124,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """Фильтрация документов по правам пользователя"""
 
         user = self.request.user
-        print(f"🔍 DEBUG: User {user.email} has view_all_documents: {user.has_perm('documents.view_all_documents')}")
-
-        if user.has_perm("documents.view_all_documents") or user.is_superuser:
-            print("✅ User can view ALL documents")
+        if user.is_superuser:
             return Document.objects.all()
-        elif user.is_staff:
-            print("👨💼 Staff user - filtered by assigned_admin")
+        if user.is_staff:
             return Document.objects.filter(assigned_admin=user)
-        else:
-            print("👤 Regular user - filtered by owner")
-            return Document.objects.filter(owner=user)
+        return Document.objects.filter(owner=user)
 
     def get_permissions(self) -> Sequence[Any]:
         """
