@@ -459,6 +459,12 @@ class QueueItemInline(admin.TabularInline):
 
     def get_readonly_fields(self, request, obj=None):
         """Определяем какие поля доступны для редактирования"""
+
+        print(f"🔍 User: {request.user}")
+        print(f"🔍 Superuser: {request.user.is_superuser}")
+        print(f"🔍 Can approve: {request.user.has_perm('documents.can_approve_document')}")
+        print(f"🔍 Can reject: {request.user.has_perm('documents.can_reject_document')}")
+
         base_readonly = [
             "id",
             "position",
@@ -469,12 +475,14 @@ class QueueItemInline(admin.TabularInline):
             "document_actions",
         ]
 
-        if (
-            request.user.is_superuser
-            or request.user.has_perm("documents.can_approve_document")
-            and request.user.has_perm("documents.can_reject_document")
+        if request.user.is_superuser:
+            return base_readonly
+
+        if request.user.has_perm("documents.can_approve_document") and request.user.has_perm(
+            "documents.can_reject_document"
         ):
             return base_readonly
+
         return base_readonly + ["temp_review_comment", "temp_file_answer"]
 
     def has_add_permission(self, request, obj=None):
