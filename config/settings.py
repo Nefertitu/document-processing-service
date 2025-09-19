@@ -43,21 +43,21 @@ else:
         os.getenv("SERVER_IP", ""),
     ]
 
-if DEBUG:
-    REST_FRAMEWORK = {
-        "DEFAULT_FILTER_BACKENDS": [
-            "django_filters.rest_framework.DjangoFilterBackend",
-            "rest_framework.filters.OrderingFilter",
-            "rest_framework.filters.SearchFilter",
-        ],
-        "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
-        "DEFAULT_PERMISSION_CLASSES": [
-            "rest_framework.permissions.IsAuthenticated",
-        ],
-        # "DEFAULT_PERMISSION_CLASSES": [],
-        "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
-        "USE_TZ": True,
-    }
+
+REST_FRAMEWORK = {
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.OrderingFilter",
+        "rest_framework.filters.SearchFilter",
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    # "DEFAULT_PERMISSION_CLASSES": [],
+    "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
+    "USE_TZ": True,
+}
 
 
 INSTALLED_APPS = [
