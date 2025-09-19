@@ -23,15 +23,15 @@ class IsOwnerOnly(permissions.BasePermission):
         return hasattr(obj, "owner") and obj.owner == request.user
 
 
-class IsOwnerOrReadOnly(permissions.BasePermission):
-    """Владелец может читать, админ может всё"""
-
-    def has_object_permission(self, request, view, obj):
-        """Проверяет уровень доступа в зависимости от метода"""
-        if request.method in permissions.SAFE_METHODS:  # GET, HEAD, OPTIONS
-            return obj.owner == request.user or request.user.is_staff
-        return request.user.is_staff
-
+# class IsOwnerOrReadOnly(permissions.BasePermission):
+#     """Владелец может читать, админ может всё"""
+#
+#     def has_object_permission(self, request, view, obj):
+#         """Проверяет уровень доступа в зависимости от метода"""
+#         if request.method in permissions.SAFE_METHODS:  # GET, HEAD, OPTIONS
+#             return obj.owner == request.user or request.user.is_staff
+#         return request.user.is_staff
+#
 
 class CanApproveDocument(permissions.BasePermission):
     """Разрешение на подтверждение документов"""
@@ -63,14 +63,12 @@ class CanAccessDocumentFile(permissions.BasePermission):
     def has_permission(self, request, view):
         """Проверка на уровне запроса"""
 
-        if request.method in permissions.SAFE_METHODS:  # (GET, HEAD, OPTIONS)
-            return True
-        elif view.action in ["create", "list", "retrieve"]:
+        if view.action in ["create", "list", "retrieve"]:
             return request.user.is_authenticated
         elif view.action == "destroy":
             return request.user.is_superuser
         else:
-            return False
+            return request.user.is_staff
 
     def has_object_permission(self, request, view, obj):
         """Проверка на уровне конкретного объекта"""

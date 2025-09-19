@@ -20,7 +20,7 @@ from rest_framework.serializers import BaseSerializer
 
 from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
 from .paginators import ApprovalItemPaginator, DocumentPaginator, QueueItemPaginator
-from .permissions import CanAccessDocumentFile, CanApproveDocument, CanRejectDocument, IsOwnerOnly, IsOwnerOrReadOnly
+from .permissions import CanAccessDocumentFile, CanApproveDocument, CanRejectDocument, IsOwnerOnly
 from .serializers import (
     ApprovalQueueSerializer,
     DocumentAdminSerializer,
@@ -121,36 +121,20 @@ class DocumentViewSet(viewsets.ModelViewSet):
     PermissionClass = Union[type[BasePermission], OperandHolder, SingleOperandHolder]
 
     def get_queryset(self) -> QuerySet[Document] | None:
-        """
-        Фильтрует документы в зависимости от прав пользователя.
-        Пользователь видит только свои документа, админ - все.
-        """
+        """Фильтрация документов по правам пользователя"""
 
         user = self.request.user
 
-        # Анонимный пользователь не может видеть документы
         if not user.is_authenticated:
-            print(f"👻 GET_QUERYSET - Action: {self.action}, User: not Authenticated")
-            raise PermissionDenied("У вас нет прав просматривать документы! Авторизуйтесь!")
-
-        print(f"🔐 User: {user.email}, is_staff: {user.is_staff}, is_superuser: {user.is_superuser}")
+            return Document.objects.none()
 
         if user.is_superuser:
-            print("👑 Superuser - returning all documents")
             return Document.objects.all()
 
         if user.is_staff:
-            # Админы видят документы, где они назначены
-            print(f"👨‍💼 Staff user - filtering by assigned_admin: {user.pk}")
-            assigned_docs = Document.objects.filter(assigned_admin=user)
-            print(f"📋 Documents assigned to admin: {list(assigned_docs.values_list('id', 'title'))}")
-            return assigned_docs
+            return Document.objects.filter(assigned_admin=user)
 
-            # Обычные пользователи видят только свои документы
-        print(f"👤 Regular user - filtering by owner: {user.pk}")
-        own_docs = Document.objects.filter(owner=user)
-        print(f"📋 Documents owned by user: {list(own_docs.values_list('id', 'title'))}")
-        return own_docs
+        return Document.objects.filter(owner=user)
 
     def get_permissions(self) -> Sequence[Any]:
         """
@@ -168,7 +152,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             permission_classes = [IsAuthenticated]
         elif self.action in ["list", "retrieve"]:
-            permission_classes = [IsOwnerOrReadOnly | IsAdminUser]
+            permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAdminUser]
         return [permission() for permission in permission_classes]
@@ -359,43 +343,26 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         if self.action in ["approve", "reject"]:
             permission_classes = [CanApproveDocument | CanRejectDocument]
         elif self.action in ["list", "retrieve"]:
-            permission_classes = [IsOwnerOrReadOnly | IsAdminUser]
+            permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAdminUser]
         return [permission() for permission in permission_classes]
 
     def get_queryset(self) -> QuerySet[QueueItem] | None:
-        """
-        Фильтрует документы в зависимости от прав пользователя и
-        статуса документов.
-        Пользователь видит только свои документа, админ - все.
-        """
+        """Фильтрация документов по правам пользователя"""
 
         user = self.request.user
 
         if not user.is_authenticated:
-            print("👻 Unauthorized user cannot see documents")
-            raise PermissionDenied("У вас нет прав просматривать документы! Авторизуйтесь!")
-
-        print(f"🔐 User: {user.email}, is_staff: {user.is_staff}, is_superuser: {user.is_superuser}")
+            return QueueItem.objects.none()
 
         if user.is_superuser:
-            print("👑 Superuser - returning all documents")
             return QueueItem.objects.filter(document__status="pending")
 
         if user.is_staff:
-            print(f"👨‍💼 Staff user - filtering by assigned_admin: {user.pk}")
-            assigned_docs = QueueItem.objects.filter(document__status="pending", document__assigned_admin=user)
-            print(
-                f"📋 Documents assigned to admin: {list(assigned_docs.values_list('id', 'document'))}, статус: {[assigned_doc.document.status for assigned_doc in assigned_docs]}"
-            )
-            return assigned_docs
+            return QueueItem.objects.filter(document__status="pending", document__assigned_admin=user)
 
-            # Обычные пользователи видят только свои документы
-        print(f"👤 Regular user - filtering by owner: {user.pk}")
-        own_docs = QueueItem.objects.filter(document__status="pending", document__owner=user)
-        print(f"📋 Documents owned by user: {list(own_docs.values_list('id', 'document'))}")
-        return own_docs
+        return QueueItem.objects.filter(document__status="pending", document__owner=user)
 
     def get_object(self) -> QueueItem:
         """Получает объект QueueItem и проверяет права доступа пользователя"""
