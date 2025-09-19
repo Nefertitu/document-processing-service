@@ -126,7 +126,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         print(f"🔍 DEBUG: User {user.email} has view_all_documents: {user.has_perm('documents.view_all_documents')}")
 
-        if user.is_superuser or user.has_perm("documents.view_all_documents"):
+        if user.has_perm("documents.view_all_documents") or user.is_superuser:
             print("✅ User can view ALL documents")
             return Document.objects.all()
         elif user.is_staff:
