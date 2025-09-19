@@ -123,16 +123,27 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[Document] | None:
         """Фильтрация документов по правам пользователя"""
 
+        print(f"🎯 GET_QUERYSET - Action: {self.action}, User: {self.request.user.email}")
+
         user = self.request.user
+        print(f"🔐 User: {user.email}, is_staff: {user.is_staff}, is_superuser: {user.is_superuser}")
 
         if user.is_superuser:
+            print("👑 Superuser - returning all documents")
             return Document.objects.all()
-        if user.is_staff:
-            return Document.objects.filter(assigned_admin=user)
-        if user.is_authenticated:
-            return Document.objects.filter(owner=user)
-        else:
-            return Document.objects.none()
+
+        if user.is_staff and not user.is_superuser:
+            # Админы видят документы, где они назначены
+            print(f"👨‍💼 Staff user - filtering by assigned_admin: {user.id}")
+            assigned_docs = Document.objects.filter(assigned_admin=user)
+            print(f"📋 Documents assigned to admin: {list(assigned_docs.values_list('id', 'title'))}")
+            return assigned_docs
+
+            # Обычные пользователи видят только свои документы
+        print(f"👤 Regular user - filtering by owner: {user.id}")
+        own_docs = Document.objects.filter(owner=user)
+        print(f"📋 Documents owned by user: {list(own_docs.values_list('id', 'title'))}")
+        return own_docs
 
     def get_permissions(self) -> Sequence[Any]:
         """
@@ -146,13 +157,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
         POST /documents/        # Подтверждение/Отклонение: только админ с special permissions
         )
         """
-        print(f"🔍 DEBUG get_permissions: Action={self.action}")
         if self.action == "create":
             return [permissions.IsAuthenticated()]
         elif self.action in ["list", "retrieve"]:
             return [permissions.IsAuthenticated()]
-        else:
+        elif self.action in ["partial_update"]:
             return [permissions.IsAdminUser()]
+        elif self.action == "destroy":
+            return [permissions.IsAdminUser()]
+        return [permissions.IsAuthenticated()]
 
     def get_serializer_class(self):
         """Выбираем сериализатор в зависимости от прав пользователя"""
