@@ -125,10 +125,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         user = self.request.user
 
-        print(
-            f"🔍 DEBUG get_queryset: User={user}, Auth={user.is_authenticated}, Staff={user.is_staff}, Superuser={user.is_superuser}"
-        )
-
         if user.is_superuser:
             return Document.objects.all()
         if user.is_staff:
