@@ -341,7 +341,7 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         """
 
         if self.action in ["approve", "reject"]:
-            return [permissions.CanApproveDocument(), permissions.CanRejectDocument()]
+            return [CanApproveDocument(), CanRejectDocument()]
         elif self.action in ["list", "retrieve"]:
             return [permissions.IsAuthenticated()]
         else:

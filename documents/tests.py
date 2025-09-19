@@ -126,11 +126,12 @@ class DocumentTestCase(APITestCase):
         print(f"👨‍💼 Админ - Status: {response.status_code}")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Проверяем доступ анонимного пользователя
+        # Проверяем доступ неавторизованного пользователя
         self.client.logout()
         response = self.client.get(url)
         print(f"👻 Аноним - Status: {response.status_code}")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_documents_list(self) -> None:
         """Тест списка документов"""
