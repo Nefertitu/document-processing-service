@@ -375,7 +375,7 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         print(f"🔐 User: {user.email}, is_staff: {user.is_staff}, is_superuser: {user.is_superuser}")
 
         if not user.is_authenticated:
-            print(f"👻 Unauthorized user cannot see documents")
+            print("👻 Unauthorized user cannot see documents")
             raise PermissionDenied("У вас нет прав просматривать документы! Авторизуйтесь!")
 
         if user.is_superuser:
