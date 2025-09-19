@@ -379,7 +379,6 @@ class QueueItemViewSet(viewsets.ModelViewSet):
 
         print(f"🔐 User: {user.email}, is_staff: {user.is_staff}, is_superuser: {user.is_superuser}")
 
-
         if user.is_superuser:
             print("👑 Superuser - returning all documents")
             return QueueItem.objects.filter(document__status="pending")
