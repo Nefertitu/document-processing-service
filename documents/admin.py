@@ -487,15 +487,23 @@ class QueueItemInline(admin.TabularInline):
 
     def has_add_permission(self, request, obj=None):
         """Запрет добавлять элементы вручную"""
-        return False
+        # return False
+        print(f"🔐 has_add_permission: user={request.user}")
+        result = super().has_add_permission(request)
+        print(f"🔐 Base result: {result}")
+        return result
 
     def has_delete_permission(self, request, obj=None):
         """Запрет удаления документов"""
-        return False
+        # return False
 
     def has_change_permission(self, request, obj=None):
         """Разрешение только на просмотр и частичное изменение"""
-        return True
+        # return True
+        print(f"🔐 has_change_permission: user={request.user}, obj={obj}")
+        result = super().has_change_permission(request, obj)
+        print(f"🔐 Base result: {result}")
+        return result
 
 
 @admin.register(ApprovalQueue)
