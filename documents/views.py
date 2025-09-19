@@ -124,11 +124,23 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """Фильтрация документов по правам пользователя"""
 
         user = self.request.user
+        print("🎯 GET_QUERYSET CALLED")
+        print(f"🎯 User: {user}")
+        print(f"🎯 User type: {type(user)}")
+        print(f"🎯 Authenticated: {user.is_authenticated}")
+        print(f"🎯 Staff: {user.is_staff}")
+        print(f"🎯 Superuser: {user.is_superuser}")
+        print(f"🎯 Auth header: {self.request.META.get('HTTP_AUTHORIZATION')}")
+
         if user.is_superuser:
+            print("✅ Case: Superuser - ALL documents")
             return Document.objects.all()
-        if user.is_staff:
+        elif user.is_staff:
+            print("✅ Case: Staff - assigned documents")
             return Document.objects.filter(assigned_admin=user)
-        return Document.objects.filter(owner=user)
+        else:
+            print("✅ Case: Regular user - own documents")
+            return Document.objects.filter(owner=user)
 
     def get_permissions(self) -> Sequence[Any]:
         """
