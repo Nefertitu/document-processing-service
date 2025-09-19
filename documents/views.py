@@ -123,27 +123,13 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[Document] | None:
         """Фильтрация документов по правам пользователя"""
 
-        print(f"🎯 GET_QUERYSET - Action: {self.action}, User: {self.request.user.email}")
-
         user = self.request.user
-        print(f"🔐 User: {user.email}, is_staff: {user.is_staff}, is_superuser: {user.is_superuser}")
-
-        if user.is_superuser:
-            print("👑 Superuser - returning all documents")
+        if user.is_superuser or user.has_perm("documents.view_all_documents"):
             return Document.objects.all()
-
-        if user.is_staff and not user.is_superuser:
-            # Админы видят документы, где они назначены
-            print(f"👨‍💼 Staff user - filtering by assigned_admin: {user.id}")
-            assigned_docs = Document.objects.filter(assigned_admin=user)
-            print(f"📋 Documents assigned to admin: {list(assigned_docs.values_list('id', 'title'))}")
-            return assigned_docs
-
-            # Обычные пользователи видят только свои документы
-        print(f"👤 Regular user - filtering by owner: {user.id}")
-        own_docs = Document.objects.filter(owner=user)
-        print(f"📋 Documents owned by user: {list(own_docs.values_list('id', 'title'))}")
-        return own_docs
+        elif user.is_staff:
+            return Document.objects.filter(assigned_admin=user)
+        else:
+            return Document.objects.filter(owner=user)
 
     def get_permissions(self) -> Sequence[Any]:
         """
