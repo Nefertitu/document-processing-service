@@ -369,14 +369,16 @@ class QueueItemViewSet(viewsets.ModelViewSet):
             obj = QueueItem.objects.get(pk=self.kwargs.get("pk"))
 
             user = self.request.user
-            if not (
+
+            if (
                 user.is_superuser
                 or (user.is_staff and obj.document.assigned_admin == user)
                 or obj.document.owner == user
             ):
-                raise PermissionDenied("У вас нет прав для доступа к этому элементу очереди")
+                return obj
 
-            return obj
+            raise PermissionDenied("У вас нет прав для доступа к этому элементу очереди")
+
         except QueueItem.DoesNotExist:
             print("❌ Объект не найден")
             raise Http404("Элемент очереди не существует")

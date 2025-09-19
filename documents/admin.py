@@ -787,13 +787,6 @@ class QueueItemAdmin(admin.ModelAdmin):
             document__isnull=False, document__status="pending", document__assigned_admin=request.user
         )
 
-    # def document_file(self, obj):
-    #     """Показывает файл из документа"""
-    #
-    #     return obj.document.file if obj.document else None
-    #
-    # document_file.short_description = "Файл на согласование"
-
     def has_add_permission(self, request):
         """Запрещаем добавлять элементы вручную"""
         return False

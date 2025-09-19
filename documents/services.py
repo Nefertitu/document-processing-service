@@ -203,15 +203,12 @@ class FolderService:
             print(f"Найдена папка: {folder.title}")
 
             old_folder = document.folder
-            old_status = document.status
 
             document.folder = folder
-            document.status = folder_slug
             document.save()
 
             print(f"✅ Документ '{document.title}' перемещен:")
             print(f"   Папка: {old_folder} → {document.folder}")
-            print(f"   Статус: {old_status} → {document.status}")
 
             return True
 
@@ -299,7 +296,7 @@ class DocumentService:
 
             print(f"Обработка документа: {document.title}, статус: {document.status}")
 
-            if document.assigned_admin != user and not user.is_superuser:
+            if document.assigned_admin != user or not user.is_superuser:
                 return {
                     "success": False,
                     "message": "Только ответственный администратор или суперпользователь может выполнять действия с документом",
