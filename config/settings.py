@@ -52,7 +52,7 @@ if DEBUG:
         ],
         "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
         "DEFAULT_PERMISSION_CLASSES": [
-            "rest_framework.permissions.AllowAny",
+            "rest_framework.permissions.IsAuthenticated",
         ],
         # "DEFAULT_PERMISSION_CLASSES": [],
         "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
@@ -198,8 +198,9 @@ AUTH_USER_MODEL = "users.User"
 LOGIN_REDIRECT_URL = "/admin/"
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
 
@@ -237,18 +238,28 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+CSRF_COOKIE_HTTPONLY = True
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://localhost:3000",
-]
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        f"http://{os.getenv("SERVER_IP")}",
+    ]
+    CSRF_COOKIE_SECURE = False
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8000",
-    "http://localhost:3000",
-]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:8000",
+        "http://localhost:3000",
+        f"https://{os.getenv("SERVER_IP")}",
+    ]
+    CSRF_COOKIE_SECURE = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS
+# CORS_ALLOW_ALL_ORIGINS = True
 
-CORS_ALLOW_ALL_ORIGINS = True
 
 HEALTH_CHECK = {
     "DISK_USAGE_MAX": 90,  # Максимальное использование диска в %

@@ -33,6 +33,7 @@ class IsOwnerOnly(permissions.BasePermission):
 #         return request.user.is_staff
 #
 
+
 class CanApproveDocument(permissions.BasePermission):
     """Разрешение на подтверждение документов"""
 

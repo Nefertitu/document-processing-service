@@ -125,16 +125,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         user = self.request.user
 
-        if not user.is_authenticated:
-            return Document.objects.none()
-
         if user.is_superuser:
             return Document.objects.all()
-
         if user.is_staff:
             return Document.objects.filter(assigned_admin=user)
-
-        return Document.objects.filter(owner=user)
+        if user.is_authenticated:
+            return Document.objects.filter(owner=user)
+        else:
+            return Document.objects.none()
 
     def get_permissions(self) -> Sequence[Any]:
         """
@@ -150,12 +148,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """
 
         if self.action == "create":
-            permission_classes = [IsAuthenticated]
+            return [IsAuthenticated()]
         elif self.action in ["list", "retrieve"]:
-            permission_classes = [IsAuthenticated]
+            return [IsAuthenticated()]
         else:
-            permission_classes = [IsAdminUser]
-        return [permission() for permission in permission_classes]
+            return [IsAdminUser()]
 
     def get_serializer_class(self):
         """Выбираем сериализатор в зависимости от прав пользователя"""
@@ -341,28 +338,25 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         """
 
         if self.action in ["approve", "reject"]:
-            permission_classes = [CanApproveDocument | CanRejectDocument]
+            return [CanApproveDocument(), CanRejectDocument()]
         elif self.action in ["list", "retrieve"]:
-            permission_classes = [IsAuthenticated]
+            return [IsAuthenticated()]
         else:
-            permission_classes = [IsAdminUser]
-        return [permission() for permission in permission_classes]
+            return [IsAdminUser()]
 
     def get_queryset(self) -> QuerySet[QueueItem] | None:
         """Фильтрация документов по правам пользователя"""
 
         user = self.request.user
 
-        if not user.is_authenticated:
-            return QueueItem.objects.none()
-
         if user.is_superuser:
             return QueueItem.objects.filter(document__status="pending")
-
         if user.is_staff:
             return QueueItem.objects.filter(document__status="pending", document__assigned_admin=user)
-
-        return QueueItem.objects.filter(document__status="pending", document__owner=user)
+        if user.is_authenticated:
+            return QueueItem.objects.filter(document__status="pending", document__owner=user)
+        else:
+            return QueueItem.objects.none()
 
     def get_object(self) -> QueueItem:
         """Получает объект QueueItem и проверяет права доступа пользователя"""
