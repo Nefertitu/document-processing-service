@@ -39,7 +39,7 @@ class FolderViewSet(viewsets.ModelViewSet):
     queryset = Folder.objects.all()
     serializer_class = FolderSerializer
     http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAdminUser()]
 
     def get_queryset(self) -> QuerySet[Folder]:
         """Получаем базовый queryset папок"""
@@ -125,14 +125,19 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         user = self.request.user
 
-        if user.is_superuser:
-            return Document.objects.all()
-        if user.is_staff:
-            return Document.objects.filter(assigned_admin=user)
-        if user.is_authenticated:
-            return Document.objects.filter(owner=user)
-        else:
-            return Document.objects.none()
+        # if user.is_superuser:
+        #     return Document.objects.all()
+        # if user.is_staff:
+        #     return Document.objects.filter(assigned_admin=user)
+        # if user.is_authenticated:
+        #     return Document.objects.filter(owner=user)
+        # else:
+        #     return Document.objects.none()
+        print(
+            f"🔍 DEBUG get_queryset: User={user}, Auth={user.is_authenticated}, Staff={user.is_staff}, Superuser={user.is_superuser}")
+
+        # ВРЕМЕННО: вернем все документы для теста
+        return Document.objects.all()
 
     def get_permissions(self) -> Sequence[Any]:
         """
@@ -147,12 +152,16 @@ class DocumentViewSet(viewsets.ModelViewSet):
         )
         """
 
-        if self.action == "create":
-            return [IsAuthenticated()]
-        elif self.action in ["list", "retrieve"]:
-            return [IsAuthenticated()]
-        else:
-            return [IsAdminUser()]
+        # if self.action == "create":
+        #     return [permissions.IsAuthenticated()]
+        # elif self.action in ["list", "retrieve"]:
+        #     return [permissions.IsAuthenticated()]
+        # else:
+        #     return [permissions.IsAdminUser()]
+        print(f"🔍 DEBUG get_permissions: Action={self.action}")
+
+        # ВРЕМЕННО: упростим permissions для теста
+        return [permissions.AllowAny()]
 
     def get_serializer_class(self):
         """Выбираем сериализатор в зависимости от прав пользователя"""
@@ -338,11 +347,11 @@ class QueueItemViewSet(viewsets.ModelViewSet):
         """
 
         if self.action in ["approve", "reject"]:
-            return [CanApproveDocument(), CanRejectDocument()]
+            return [permissions.CanApproveDocument(), permissions.CanRejectDocument()]
         elif self.action in ["list", "retrieve"]:
-            return [IsAuthenticated()]
+            return [permissions.IsAuthenticated()]
         else:
-            return [IsAdminUser()]
+            return [permissions.IsAdminUser()]
 
     def get_queryset(self) -> QuerySet[QueueItem] | None:
         """Фильтрация документов по правам пользователя"""
