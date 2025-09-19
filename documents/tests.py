@@ -136,6 +136,7 @@ class DocumentTestCase(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         else:
             self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_documents_list(self) -> None:
         """Тест списка документов"""
 
