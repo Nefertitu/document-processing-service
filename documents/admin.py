@@ -469,9 +469,12 @@ class QueueItemInline(admin.TabularInline):
             "document_actions",
         ]
 
-        if request.user.is_superuser or request.user.has_perm("documents.view_all_documents"):
+        if (
+            request.user.is_superuser
+            or request.user.has_perm("documents.can_approve_document")
+            and request.user.has_perm("documents.can_reject_document")
+        ):
             return base_readonly
-
         return base_readonly + ["temp_review_comment", "temp_file_answer"]
 
     def has_add_permission(self, request, obj=None):

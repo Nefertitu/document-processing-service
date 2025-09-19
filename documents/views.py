@@ -124,22 +124,12 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """Фильтрация документов по правам пользователя"""
 
         user = self.request.user
-        print("🎯 GET_QUERYSET CALLED")
-        print(f"🎯 User: {user}")
-        print(f"🎯 User type: {type(user)}")
-        print(f"🎯 Authenticated: {user.is_authenticated}")
-        print(f"🎯 Staff: {user.is_staff}")
-        print(f"🎯 Superuser: {user.is_superuser}")
-        print(f"🎯 Auth header: {self.request.META.get('HTTP_AUTHORIZATION')}")
 
         if user.is_superuser:
-            print("✅ Case: Superuser - ALL documents")
             return Document.objects.all()
         elif user.is_staff:
-            print("✅ Case: Staff - assigned documents")
             return Document.objects.filter(assigned_admin=user)
         else:
-            print("✅ Case: Regular user - own documents")
             return Document.objects.filter(owner=user)
 
     def get_permissions(self) -> Sequence[Any]:
@@ -238,17 +228,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
             instance.save()
 
         super().perform_update(serializer)
-
-    class DocumentViewSet(viewsets.ModelViewSet):
-        def list(self, request, *args, **kwargs):
-            print(f"🎯 User: {request.user}")
-            print(f"🎯 Auth: {request.user.is_authenticated}")
-            print(f"🎯 Staff: {request.user.is_staff}")
-            print(f"🎯 Superuser: {request.user.is_superuser}")
-            print(f"🎯 Has view_all_documents: {request.user.has_perm('documents.view_all_documents')}")
-            print(f"🎯 Auth header: {request.META.get('HTTP_AUTHORIZATION')}")
-
-            return super().list(request, *args, **kwargs)
 
 
 class ApprovalQueueViewSet(viewsets.ModelViewSet):
@@ -372,7 +351,11 @@ class QueueItemViewSet(viewsets.ModelViewSet):
 
         if user.is_superuser:
             return QueueItem.objects.filter(document__status="pending")
-        if user.is_staff:
+        if (
+            user.is_staff
+            and user.has_perm("documents.can_approve_document")
+            and user.has_perm("documents.can_reject_document")
+        ):
             return QueueItem.objects.filter(document__status="pending", document__assigned_admin=user)
         if user.is_authenticated:
             return QueueItem.objects.filter(document__status="pending", document__owner=user)
