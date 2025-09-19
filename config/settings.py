@@ -245,7 +245,8 @@ if DEBUG:
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
-        f"http://{os.getenv("SERVER_IP")}",
+        "http://51.250.110.74",
+        "https://51.250.110.74",
     ]
     CSRF_COOKIE_SECURE = False
 
@@ -253,7 +254,8 @@ else:
     CSRF_TRUSTED_ORIGINS = [
         "http://localhost:8000",
         "http://localhost:3000",
-        f"https://{os.getenv("SERVER_IP")}",
+        "http://127.0.0.1:3000",
+        "https://51.250.110.74",
     ]
     CSRF_COOKIE_SECURE = True
 CORS_ALLOW_CREDENTIALS = True

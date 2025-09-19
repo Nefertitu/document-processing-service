@@ -20,7 +20,7 @@ from rest_framework.serializers import BaseSerializer
 
 from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
 from .paginators import ApprovalItemPaginator, DocumentPaginator, QueueItemPaginator
-from .permissions import CanAccessDocumentFile, CanApproveDocument, CanRejectDocument, IsOwnerOnly
+from .permissions import CanAccessDocumentFile, CanApproveDocument, CanRejectDocument
 from .serializers import (
     ApprovalQueueSerializer,
     DocumentAdminSerializer,
@@ -124,11 +124,16 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """Фильтрация документов по правам пользователя"""
 
         user = self.request.user
+        print(f"🔍 DEBUG: User {user.email} has view_all_documents: {user.has_perm('documents.view_all_documents')}")
+
         if user.is_superuser or user.has_perm("documents.view_all_documents"):
+            print("✅ User can view ALL documents")
             return Document.objects.all()
         elif user.is_staff:
+            print("👨💼 Staff user - filtered by assigned_admin")
             return Document.objects.filter(assigned_admin=user)
         else:
+            print("👤 Regular user - filtered by owner")
             return Document.objects.filter(owner=user)
 
     def get_permissions(self) -> Sequence[Any]:
@@ -227,6 +232,17 @@ class DocumentViewSet(viewsets.ModelViewSet):
             instance.save()
 
         super().perform_update(serializer)
+
+    class DocumentViewSet(viewsets.ModelViewSet):
+        def list(self, request, *args, **kwargs):
+            print(f"🎯 User: {request.user}")
+            print(f"🎯 Auth: {request.user.is_authenticated}")
+            print(f"🎯 Staff: {request.user.is_staff}")
+            print(f"🎯 Superuser: {request.user.is_superuser}")
+            print(f"🎯 Has view_all_documents: {request.user.has_perm('documents.view_all_documents')}")
+            print(f"🎯 Auth header: {request.META.get('HTTP_AUTHORIZATION')}")
+
+            return super().list(request, *args, **kwargs)
 
 
 class ApprovalQueueViewSet(viewsets.ModelViewSet):
