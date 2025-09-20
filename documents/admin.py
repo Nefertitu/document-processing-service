@@ -531,10 +531,11 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         """Скрываем стандартные кнопки в админке"""
 
         extra_context = extra_context or {}
-        extra_context["show_save"] = False
+        extra_context["show_save"] = True
         extra_context["show_save_and_continue"] = False
         extra_context["show_save_and_add_another"] = False
         extra_context["show_close"] = True
+        extra_context["show_add"] = True
 
         return super().change_view(request, object_id, form_url, extra_context)
 
