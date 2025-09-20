@@ -5,6 +5,7 @@ from django.core.files.base import ContentFile
 from django.core.management import color
 from django.db import models
 from django.db.models import Count, Max, Min
+from django.utils import timezone
 
 from config import settings
 
@@ -238,7 +239,7 @@ class ApprovalQueue(models.Model):
         max_length=200,
         verbose_name="Название очереди",
         help_text="Укажите название очереди",
-        default="Документы в работе",
+        default=f"Документы в работе {timezone.localtime()}",
     )
     approver = models.ForeignKey(
         settings.AUTH_USER_MODEL,
