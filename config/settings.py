@@ -145,14 +145,6 @@ STATIC_URL = "/static/"
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# if DEBUG:
-#     STATICFILES_DIRS = [
-#         BASE_DIR / "static"
-# BASE_DIR / "staticfiles"
-#     ]
-# else:
-#     STATICFILES_DIRS = []
-
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 MEDIA_URL = "/media/"
@@ -260,7 +252,6 @@ else:
     CSRF_COOKIE_SECURE = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS
-# CORS_ALLOW_ALL_ORIGINS = True
 
 
 HEALTH_CHECK = {
@@ -291,6 +282,18 @@ if not DEBUG:
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB в байтах
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB в байтах
+
+SWAGGER_SETTINGS = {
+    "SECURITY_DEFINITIONS": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "JWT Token. Example: 'Bearer {token}'",
+        }
+    },
+    "USE_SESSION_AUTH": False,
+}
 
 LOGGING = {
     "version": 1,
