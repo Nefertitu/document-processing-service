@@ -203,12 +203,15 @@ class FolderService:
             print(f"Найдена папка: {folder.title}")
 
             old_folder = document.folder
+            old_status = document.status
 
             document.folder = folder
+            document.status = folder_slug
             document.save()
 
             print(f"✅ Документ '{document.title}' перемещен:")
             print(f"   Папка: {old_folder} → {document.folder}")
+            print(f"   Статус: {old_status} → {document.status}")
 
             return True
 
@@ -296,7 +299,9 @@ class DocumentService:
 
             print(f"Обработка документа: {document.title}, статус: {document.status}")
 
-            if document.assigned_admin != user or not user.is_superuser:
+            if not user.is_superuser and not (
+                user.has_perm("documents.can_approve_document") and user.has_perm("documents.can_reject_document")
+            ):
                 return {
                     "success": False,
                     "message": "Только ответственный администратор или суперпользователь может выполнять действия с документом",
@@ -306,10 +311,7 @@ class DocumentService:
                 document.status = "approved"
                 message = f"Документ '{document.title}' одобрен"
                 document.reviewed_at = timezone.localtime()
-                # if review_comment:
-                #     document.review_comment = review_comment
-                # if file_answer:
-                #     document.file_answer = file_answer
+
                 document.reviewed_by = user
                 document.save()
                 send_single_document_email.delay(
@@ -318,16 +320,13 @@ class DocumentService:
 
                 print(f"Статус изменен на: {document.status}")
                 FolderService.move_to_approved(document)
-                archive_old_documents.delay()
+                # archive_old_documents.delay()
 
             elif action == "reject":
                 document.status = "rejected"
                 message = f"Документ '{document.title}' отклонен"
                 document.reviewed_at = timezone.localtime()
-                # if review_comment:
-                #     document.review_comment = review_comment
-                # if file_answer:
-                #     document.file_answer = file_answer
+
                 document.reviewed_by = user
                 document.save()
                 send_single_document_email.delay(
@@ -335,7 +334,7 @@ class DocumentService:
                 )
                 print(f"Статус изменен на: {document.status}")
                 FolderService.move_to_rejected(document)
-                archive_old_documents.delay()
+                # archive_old_documents.delay()
 
             if queue_item:
                 queue_item.delete()

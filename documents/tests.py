@@ -450,12 +450,9 @@ class QueueItemTestCase(APITestCase):
         reject_perm, created = Permission.objects.get_or_create(
             codename="can_reject_document", content_type=content_type, defaults={"name": "Can reject document"}
         )
-        view_all_perm, created = Permission.objects.get_or_create(
-            codename="view_all_documents", content_type=content_type, defaults={"name": "Can view all documents"}
-        )
 
         # Назначаем права пользователю
-        self.admin.user_permissions.add(approve_perm, reject_perm, view_all_perm)
+        self.admin.user_permissions.add(approve_perm, reject_perm)
         self.admin.save()
 
         self.document = Document.objects.create(
@@ -464,6 +461,7 @@ class QueueItemTestCase(APITestCase):
             title="Test document",
         )
         self.approvalqueue = ApprovalQueue.objects.create(title="Test Approval", approver=self.admin)
+
         self.queue_item = QueueItem.objects.create(
             queue=self.approvalqueue,
             document=self.document,
@@ -617,6 +615,8 @@ class QueueItemTestCase(APITestCase):
             "status": "rejected",
         }
         response = self.client.post(url, data, format="multipart")
+        data = response.json()
+        print(f"data123: {data}")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -1042,8 +1042,8 @@ class ArchiveOldDocumentTaskTest(APITestCase):
             status="approved",
             owner=self.user,
             assigned_admin=self.admin,
-            reviewed_at=timezone.localtime() - timedelta(hours=2),
-            uploaded_at=timezone.localtime() - timedelta(hours=3),
+            reviewed_at=timezone.localtime() - timedelta(minutes=6),
+            uploaded_at=timezone.localtime() - timedelta(minutes=10),
             reviewed_by=self.admin,
         )
 
