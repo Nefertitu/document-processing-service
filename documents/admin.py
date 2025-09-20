@@ -725,19 +725,19 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         else:
             messages.error(request, result["message"])
 
-    def has_add_permission(self, request, obj=None):
-        """Запрет добавлять элементы вручную"""
-        return False
-
     def has_delete_permission(self, request, obj=None):
-        """Запрет удаления документов"""
-        return False
+        """Разрешение удаления очереди"""
+        return True
 
     def has_change_permission(self, request, obj=None):
         """Разрешение только на просмотр текущему администратору"""
 
         if obj:
             return obj.approver == request.user
+        return True
+
+    def has_add_permission(self, request):
+        """Разрешение добавлять элементы вручную"""
         return True
 
 

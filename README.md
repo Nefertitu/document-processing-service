@@ -217,6 +217,10 @@ newgrp docker
 
 5. Создание суперпользователя:
 
+```
+docker-compose exec web python manage.py csu
+```
+
 * Данные по умолчанию:
 - **Email**: `superuser@example.com`
 - **Password**: `123qwer`
@@ -227,7 +231,25 @@ newgrp docker
 SUPERUSER_EMAIL=your_email@example.com
 SUPERUSER_PASSWORD=your_secure_password
 ```
-6. Создать Группы администраторов с правами спомощью фикстуры: 
+
+6. Создание администратора:
+
+```
+docker-compose exec web python manage.py csu
+```
+
+* Данные по умолчанию:
+- **Email**: `superuser@example.com`
+- **Password**: `123qwer`
+
+* Для изменения данных:
+Заполните в файле `.env` (см. шаблон '.env.sample'):
+```
+SUPERUSER_EMAIL=your_email@example.com
+SUPERUSER_PASSWORD=your_secure_password
+```
+
+6. Создать Группы администраторов с правами с помощью фикстуры: 
 ```
 docker-compose exec web python manage.py loaddata groups.json
 ```
