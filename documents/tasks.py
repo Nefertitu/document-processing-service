@@ -24,21 +24,14 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
     try:
         document = Document.objects.get(id=document_id)
         print(f"🎯 START: Задача отправки сообщения о документе: {document.pk} {document.title} {document.status}")
-        user = document.owner
+
         comment = document.review_comment
 
-        if document.status == "pending":
-            print(f"Попытка отправки email на адрес: {settings.DEFAULT_FROM_EMAIL}")
-        print(f"Попытка отправки email на: {user.email}")
-        print(f"От: {settings.DEFAULT_FROM_EMAIL}")
-        print(f"Тема: {document.title}")
-
         if status == "pending":
-            subject = "Получен документ на согласование"
+
+            subject = "Получен документ на согласование!"
             message = f"Документ '{document.title}' создан {document.uploaded_at}, ожидает подтверждения."
-            print(
-                f"Создан документ: {document.title}, ожидает подтверждения, уведомление отправлено на почту пользователю {document.owner.email}"
-            )
+
             result = send_mail(
                 subject=subject,
                 message=message,
@@ -46,7 +39,9 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
                 recipient_list=[document.assigned_admin.email],
                 fail_silently=False,
             )
-
+            print(
+                f"✅ Создан документ: {document.title}, ожидает подтверждения, уведомление отправлено на почту пользователю {settings.DEFAULT_FROM_EMAIL}"
+            )
             print(f"Результат отправки: {result}")
 
         elif status == "approved":
@@ -71,7 +66,7 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
 
             result = email.send()
             print(
-                f"Подтвержден документ: {document.title}, уведомление отправлено на почту пользователю {document.owner.email}"
+                f"✅ Подтвержден документ: {document.title}, уведомление отправлено на почту пользователю {document.owner.email}"
             )
             print(f"Результат отправки: {result}")
 
@@ -96,12 +91,10 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
                     print("Ответный файл не найден на диске!")
 
             result = email.send()
-            print(f"Результат отправки: {result}")
-            print(f"Отправлено уведомление пользователю {user.email} о статусе документа: {status}")
             print(
-                f"Отклонен документ: {document.title}, уведомление отправлено на почту пользователю {document.owner.email}"
+                f"ℹ️ Отклонен документ: {document.title}, уведомление отправлено на почту пользователю {document.owner.email}"
             )
-
+            print(f"Результат отправки: {result}")
     except Exception as e:
         print(f"Ошибка при отправке сообщения: {str(e)}")
 

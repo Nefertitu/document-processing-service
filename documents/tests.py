@@ -794,7 +794,7 @@ class SendInformationTaskTest(APITestCase):
         send_single_document_email(document_id=self.document.pk, status=self.document.status, comment="")
 
         mock_send_mail.assert_called_once_with(
-            subject="Получен документ на согласование",
+            subject="Получен документ на согласование!",
             message=f"Документ '{self.document.title}' создан {self.document.uploaded_at}, ожидает подтверждения.",
             from_email=os.getenv("EMAIL_HOST_USER"),
             recipient_list=[self.admin.email],
@@ -803,7 +803,7 @@ class SendInformationTaskTest(APITestCase):
 
         args, kwargs = mock_send_mail.call_args
 
-        self.assertEqual(kwargs.get("subject"), "Получен документ на согласование")
+        self.assertEqual(kwargs.get("subject"), "Получен документ на согласование!")
 
         message = kwargs.get("message", "")
         self.assertIn(f"Документ '{self.document.title}' создан", message)
