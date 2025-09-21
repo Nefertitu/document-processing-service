@@ -528,6 +528,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         "title",
     )
     readonly_fields = ("documents_count", "approver_info")
+    exclude = ["approver_info"]
 
     inlines = [QueueItemInline]
 

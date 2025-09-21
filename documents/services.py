@@ -504,6 +504,7 @@ class QueueService:
 
         try:
             from .models import QueueItem
+
             items = QueueItem.objects.filter(queue=queue_id).order_by("position")
             print(f"Реорганизация очереди {queue_id}, элементов: {items.count()}")
             for index, item in enumerate(items, start=1):
