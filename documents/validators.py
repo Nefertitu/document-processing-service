@@ -10,7 +10,7 @@ from rest_framework.exceptions import ValidationError
 class DocumentFileValidator:
     """Класс-валидатор для проверки поля 'file' экземпляра 'Document'"""
 
-    def __init__(self, max_size=4 * 1024 * 1024) -> None:
+    def __init__(self, max_size: int = 4 * 1024 * 1024) -> None:
         """Класс-валидатор работает с фиксированными полями"""
         self.max_size = max_size
 

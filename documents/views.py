@@ -1,10 +1,11 @@
 import os
-from typing import Any, Sequence, Union, Type
+from typing import Any, Sequence, Union, Type, Optional
 
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, QuerySet
-from django.http import FileResponse, HttpResponseForbidden
+from django.http import HttpResponseForbidden, FileResponse
 from django.http import Http404
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -154,7 +155,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return [permissions.IsAdminUser()]
         return [permissions.IsAuthenticated()]
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Type[serializers.Serializer]:
         """Выбираем сериализатор в зависимости от прав пользователя"""
 
         user = self.request.user
@@ -164,11 +165,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return DocumentAdminSerializer
         return DocumentSerializer
 
-    def perform_create(self, serializer):
+    def perform_create(self, serializer: serializers.Serializer) -> None:
         """Устанавливаем владельца автоматически"""
         serializer.save(owner=self.request.user)
 
-    def create(self, request, *args: Any, **kwargs: Any):
+    def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Только обычные пользователи могут создавать документы"""
 
         document = None
@@ -201,24 +202,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({"error": f"Не удалось создать документ: {e}"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @login_required
-    def protected_media(request, path):
-        """View для защиты медиафайлов"""
-
-        file_path = os.path.join(settings.MEDIA_ROOT, path)
-
-        document = Document.objects.get(file__contains=file_path)
-        if request.user != document.owner and not request.user.has_perm("view_all_documents"):
-            return HttpResponseForbidden("Доступ запрещен")
-
-        if os.path.exists(file_path):
-            return FileResponse(open(file_path, "rb"))
-        else:
-            from django.http import Http404
-
-            raise Http404("Файл не найден")
-
-    def perform_update(self, serializer):
+    def perform_update(self, serializer: serializers.Serializer) -> None:
         """Если есть комментарий или файл ответа, но нет проверяющего администратора"""
 
         instance = serializer.instance

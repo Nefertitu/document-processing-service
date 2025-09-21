@@ -1,14 +1,16 @@
 import io
+from io import BytesIO
 import os
 import uuid
 from datetime import timedelta
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union, List
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
 # from django.core.exceptions import ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.files.uploadedfile import UploadedFile
 from django.db import models, transaction
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -18,11 +20,15 @@ from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
-
 from .tasks import archive_old_documents, send_single_document_email
 from .validators import DocumentFileValidator
 
 User = get_user_model()
+
+
+if TYPE_CHECKING:
+    User = get_user_model()
+    from .models import Document, ApprovalQueue, QueueItem, Folder, DocumentFile
 
 
 class DocumentFilePathGeneratorService:
@@ -37,7 +43,7 @@ class DocumentFilePathGeneratorService:
     def admin_document_path(instance: models.Model, filename: str) -> str:
         """Путь для файлов, загружаемых администраторами"""
 
-        from .models import Document, DocumentFile
+        from .models import Document
 
         if isinstance(instance, DocumentFile):
             admin_id = getattr(instance.document.assigned_admin, "id", "system")
@@ -81,7 +87,7 @@ class DocumentHeavyProcessingService:
     MAX_HEIGHT = 800
 
     @staticmethod
-    def optimize_image(image_file):
+    def optimize_image(image_file: UploadedFile) -> Optional[BytesIO]:
         """Сжимает и оптимизирует изображение"""
 
         file_size_mb = image_file.size / (1024 * 1024)
@@ -124,7 +130,7 @@ class DocumentHeavyProcessingService:
             print(f"❌ Ошибка: {e}")
             return None
 
-    def generate_test_image_content(width=1000, height=1000, format="JPEG"):
+    def generate_test_image_content(width: int = 1000, height: int = 1000, format: str = "JPEG") -> bytes:
         """Генерирует тестовое изображение в памяти"""
 
         import io
@@ -149,7 +155,7 @@ class DocumentHeavyProcessingService:
         return output.getvalue()
 
 
-def get_next_available_admin(exclude_admin=None):
+def get_next_available_admin(exclude_admin: Optional[User] = None) -> Optional[User]:
     """Возвращает следующего доступного администратора"""
 
     from documents.models import QueueItem
@@ -181,21 +187,28 @@ def get_next_available_admin(exclude_admin=None):
 class FolderService:
     """Сервис для работы с папками документов"""
 
+    if TYPE_CHECKING:
+        from .models import Document
+
     @staticmethod
-    def move_to_approved(document):
+    def move_to_approved(document: "Document") -> bool:
         """Перемещает в папку одобренных"""
+        from .models import Document
+
         return FolderService.move_to_folder(document, "approved")
 
     @staticmethod
-    def move_to_rejected(document):
+    def move_to_rejected(document: "Document") -> bool:
         """Перемещает в папку отклоненных"""
+        from .models import Document
+
         return FolderService.move_to_folder(document, "rejected")
 
     @staticmethod
-    def move_to_folder(document, folder_slug):
+    def move_to_folder(document: "Document", folder_slug: str) -> bool:
         """Перемещает документ в указанную папку"""
 
-        from .models import Folder
+        from .models import Folder, Document
 
         try:
             print(f"Попытка перемещения документа {document.id} в папку {folder_slug}")
@@ -223,8 +236,10 @@ class FolderService:
             return False
 
     @staticmethod
-    def move_to_archive(document):
+    def move_to_archive(document: "Document") -> bool:
         """Перемещает в архив"""
+        from .models import Document
+
         return FolderService.move_to_folder(document, "archived")
 
 
@@ -232,10 +247,10 @@ class DocumentService:
     """Сервис для работы с документами"""
 
     @staticmethod
-    def create_document(validated_data, user, files_data):
+    def create_document(validated_data: Dict[str, Any], user: "User", files_data: List[UploadedFile]) -> "Document":
         """Создание документа с бизнес-логикой"""
 
-        from .models import ApprovalQueue, Document, DocumentFile, Folder, QueueItem
+        from .models import ApprovalQueue, Document, QueueItem
 
         if not files_data:
             raise DjangoValidationError("Загрузите хотя бы один файл!")
@@ -285,7 +300,7 @@ class DocumentService:
         return document
 
     @staticmethod
-    def handle_queue_action(item_id, user, action, temp_review_comment="", temp_file_answer=None):
+    def handle_queue_action(item_id: int, user: "User", action: str) -> Dict[str, Any]:
         """Обработка действий с документом в очереди (одобрение/отклонение)"""
 
         from .models import QueueItem
@@ -294,8 +309,6 @@ class DocumentService:
         try:
             queue_item = QueueItem.objects.select_related("document", "queue").get(id=item_id)
             document = queue_item.document
-            # review_comment = document.review_comment
-            # file_answer = document.file_answer
 
             print(f"Обработка документа: {document.title}, статус: {document.status}")
 
@@ -349,7 +362,7 @@ class DocumentService:
             return {"success": False, "message": f"Ошибка: {str(e)}"}
 
     @staticmethod
-    def move_to_new_queue(document, new_admin):
+    def move_to_new_queue(document: "Document", new_admin: "User") -> bool | None:
         """Перемещение документа в другую очередь"""
 
         from .models import QueueItem
@@ -361,7 +374,7 @@ class DocumentService:
 
         return QueueService.add_document_to_queue(document)
 
-    def set_reviewed_at(self, document_id: int):
+    def set_reviewed_at(self, document_id: int) -> "Document":
         """Устанавливает время утверждения документа"""
 
         from .models import Document
@@ -379,7 +392,7 @@ class QueueService:
     """Сервис для работы с очередями документов"""
 
     @staticmethod
-    def add_document_to_queue(document):
+    def add_document_to_queue(document: "Document") -> bool | None:
         """Добавляет документ в очередь с автоматической позицией"""
 
         from .models import ApprovalQueue, Document, QueueItem
@@ -433,10 +446,10 @@ class QueueService:
             return False
 
     @staticmethod
-    def find_suitable_queue_for_document(document):
+    def find_suitable_queue_for_document(document: "Document") -> "ApprovalQueue" | None:
         """Найти или создать подходящую очередь для документа"""
 
-        from .models import ApprovalQueue
+        from .models import ApprovalQueue, Document
 
         print(f"Попытка определить для документа {document.title} подходящую очередь")
 
@@ -472,7 +485,7 @@ class QueueService:
             return None
 
     @staticmethod
-    def get_or_create_queue(admin):
+    def get_or_create_queue(admin: "User") -> Tuple["ApprovalQueue", bool]:
         """Получает или создает очередь для администратора"""
 
         from .models import ApprovalQueue
@@ -483,21 +496,19 @@ class QueueService:
         return queue, created
 
     @staticmethod
-    def reorganize_queue(queue):
+    def reorganize_queue(queue_id: int) -> bool:
         """Реорганизует позиции в очереди после удаления элемента"""
 
-        from .models import QueueItem
-
         try:
-            items = QueueItem.objects.filter(queue=queue).order_by("position")
-            print(f"Реорганизация очереди {queue}, элементов: {items.count()}")
+            items = QueueItem.objects.filter(queue=queue_id).order_by("position")
+            print(f"Реорганизация очереди {queue_id}, элементов: {items.count()}")
             for index, item in enumerate(items, start=1):
                 if item.position != index:
                     print(f"Обновление позиции {item.position} -> {index}")
                     item.position = index
                     item.save(update_fields=["position"])
 
-            print(f"Очередь {queue} успешно реорганизована")
+            print(f"Очередь {queue_id} успешно реорганизована")
             return True
 
         except Exception as e:
@@ -505,7 +516,7 @@ class QueueService:
             return False
 
     @staticmethod
-    def stop_queue(admin, title_queue):
+    def stop_queue(admin: "User", title_queue: str) -> bool:
         """Останавливает очередь администратора"""
 
         from .models import ApprovalQueue
@@ -519,7 +530,7 @@ class QueueService:
         return False
 
     @staticmethod
-    def resume_queue(admin, title_queue):
+    def resume_queue(admin: "User", title_queue: str) -> bool:
         """Возобновляет работу очереди администратора"""
 
         from .models import ApprovalQueue
@@ -533,29 +544,31 @@ class QueueService:
         return False
 
 
-def setup_task_archive_old_documents(document_id):
+def setup_task_archive_old_documents(document_id: int) -> None:
     """Устанавливаем расписание для выполнения переноса документов в папку 'архив'"""
 
     from .models import Document
 
-    document = Document.objects.get(id=document_id)
+    try:
+        Document.objects.get(id=document_id)
 
-    if document:
+    except Document.DoesNotExist:
+        print(f"❌ Документ с ID {document_id} не найден")
 
-        if not PeriodicTask.objects.filter(task="documents.tasks.archive_old_documents").exists():
-            schedule, created = IntervalSchedule.objects.get_or_create(
-                every=5,
-                period=IntervalSchedule.MINUTES,
-            )
+    if not PeriodicTask.objects.filter(task="documents.tasks.archive_old_documents").exists():
+        schedule, created = IntervalSchedule.objects.get_or_create(
+            every=5,
+            period=IntervalSchedule.MINUTES,
+        )
 
-            task, created = PeriodicTask.objects.get_or_create(
-                name="Archive old documents daily",
-                task="documents.tasks.archive_old_documents",
-                interval=schedule,
-                enabled=True,
-            )
+        task, created = PeriodicTask.objects.get_or_create(
+            name="Archive old documents daily",
+            task="documents.tasks.archive_old_documents",
+            interval=schedule,
+            enabled=True,
+        )
 
-            print("✅ Задача создана!")
+        print("✅ Задача создана!")
 
-        else:
-            print("ℹ️ Задача архивации уже существует")
+    else:
+        print("ℹ️ Задача архивации уже существует")

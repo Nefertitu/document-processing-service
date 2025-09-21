@@ -518,7 +518,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         "title",
         "documents_count",
         "status_approval",
-        "approver",
+        "approver_info",
         "created_at",
     )
 
@@ -527,7 +527,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         "approver__full_name",
         "title",
     )
-    readonly_fields = ("documents_count",)
+    readonly_fields = ("documents_count", "approver_info")
 
     inlines = [QueueItemInline]
 
@@ -553,6 +553,13 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         if user.is_superuser:
             return queryset
         return queryset.filter(approver=user)
+
+    def approver_info(self, obj: ApprovalQueue) -> str:
+        """Кастомное отображение 'approver'"""
+        if obj.approver:
+            return f"{obj.approver.get_full_name()} \n({obj.approver.email})"
+
+    approver_info.short_description = "Ответственный администратор"
 
     def get_urls(self) -> List[Union[URLPattern, URLResolver]]:
         """Добавляем кастомные URLs для действий"""

@@ -1,5 +1,7 @@
 import os
 
+from typing import Any, Optional
+
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.management import color
@@ -39,7 +41,7 @@ class Folder(models.Model):
         return self.title
 
     @classmethod
-    def ensure_system_folders(cls):
+    def ensure_system_folders(cls) -> None:
         """Создает системные папки если они не существуют"""
 
         style = color.color_style()
@@ -154,14 +156,14 @@ class Document(models.Model):
         """Строковое отображение модели Документ"""
         return f"{self.title}"
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Создание системных папок"""
 
         if not self.folder:
             self.folder, created = Folder.objects.get_or_create(slug="pending", defaults={"title": "На рассмотрении"})
         super().save(*args, **kwargs)
 
-    def assign_admin(self, admin=None):
+    def assign_admin(self, admin=None) -> Optional[User]:
         """Автоматически назначает администратора для документа"""
 
         if admin:
@@ -207,7 +209,7 @@ class DocumentFile(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     original_name = models.CharField(max_length=255)
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Определяет способ записи наименования файла"""
 
         if not self.original_name:
@@ -227,7 +229,7 @@ class DocumentFile(models.Model):
 class ApprovalQueueManager(models.Manager):
     """Класс менеджер модели 'ApprovalQueue'"""
 
-    def reorganize(self, queue_id):
+    def reorganize(self, queue_id: int) -> bool:
         """Импорт сервисного метода реорганизации очереди"""
         return QueueService.reorganize_queue(queue_id)
 
@@ -277,7 +279,7 @@ class ApprovalQueue(models.Model):
     #     """Получить следующий документ для обработки"""
     #     return self.items.order_by("position").first()
 
-    def reorganize(self):
+    def reorganize(self) -> bool:
         """Пересчитывает позиции элементов в очереди"""
         return self.__class__.objects.reorganize(self.pk)
 
@@ -285,7 +287,7 @@ class ApprovalQueue(models.Model):
 class QueueItemManager(models.Manager):
     """Модель менеджер очереди"""
 
-    def create_with_position(self, **kwargs):
+    def create_with_position(self, **kwargs: Any) -> "QueueItem":
         """Создает элемент очереди с автоматическим определением позиции"""
 
         document = kwargs.get("document")
@@ -307,6 +309,8 @@ class QueueItemManager(models.Manager):
 
 class QueueItem(models.Model):
     """Модель Элемент очереди с позицией"""
+
+    objects = QueueItemManager()
 
     queue = models.ForeignKey(
         "ApprovalQueue",
@@ -342,8 +346,6 @@ class QueueItem(models.Model):
         null=True,
     )
 
-    objects = QueueItemManager()
-
     def __str__(self) -> str:
         return f"ID: {self.pk} {self.document.title}, (позиция в очереди: {self.position})"
 
@@ -360,7 +362,7 @@ class QueueItem(models.Model):
             ("can_upload_answer_file", "Может загружать ответные файлы"),
         ]
 
-    def get_document(self):
+    def get_document(self) -> Document | None:
         """Безопасное получение документа"""
 
         try:
@@ -368,30 +370,12 @@ class QueueItem(models.Model):
         except Document.DoesNotExist:
             return None
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Сохранение элемента очереди"""
 
         super().save(*args, **kwargs)
 
-        # if self._state.adding and self.position == 0:
-        #     new_position = self.queue.get_next_position()
-        #     print(f"Следующая позиция: {new_position}")
-        #
-        #     print(f"Setting position from {self.position} to {new_position}")
-        #     self.position = new_position
-        #     super().save(update_fields=["position"])
-        #     print(f"QueueItem saved with ID: {self.id}, position: {self.position}")
-
-        # if not QueueItem.objects.filter(queue=queue, document=document).exists():
-        #     item = QueueItem.objects.create(
-        #         queue=queue,
-        #         document=document,
-        #         position=ApprovalQueue.get_next_position(queue)
-        #     )
-        #     print(f"✅ Документ {document.id} добавлен в очередь: {item.id}")
-        #     return True
-
-    def delete(self, *args, **kwargs):
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
         """Переопределяем удаление для автоматической реорганизации очереди"""
 
         queue = self.queue

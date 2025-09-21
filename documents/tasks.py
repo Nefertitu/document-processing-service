@@ -100,7 +100,7 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
 
 
 @shared_task
-def optimize_image_task(document_file_id):
+def optimize_image_task(document_file_id: int) -> str:
     """Фоновая оптимизация файлов"""
 
     print(f"🎯 START: Задача оптимизации для файла ID: {document_file_id}")
@@ -154,7 +154,7 @@ def optimize_image_task(document_file_id):
 
 
 @shared_task
-def archive_old_documents():
+def archive_old_documents() -> int:
     """Автоматически переносит в архив старые документы"""
 
     from .models import Document

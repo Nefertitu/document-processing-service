@@ -144,7 +144,6 @@ class DocumentSerializer(BaseDocumentSerializer):
             "required": "Поле обязательно для заполнения!",
             "blank": "Поле не может быть пустым!",
             # "invalid": "Неверный ввод!",
-            # "null": "Поле не может быть null!"
         },
     )
     description = serializers.CharField(
@@ -237,7 +236,7 @@ class DocumentAdminSerializer(BaseDocumentSerializer):
     )
     file_url = serializers.SerializerMethodField()
 
-    def get_assigned_admin_info(self, obj: Document) -> dict:
+    def get_assigned_admin_info(self, obj: Document) -> dict | None:
         """Добавляет информацию об администраторе"""
 
         if obj.assigned_admin:
