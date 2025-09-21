@@ -1,9 +1,10 @@
+from __future__ import annotations
 import io
 from io import BytesIO
 import os
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union, List
+from typing import Any, Dict, Optional, Tuple, Union, List
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -23,12 +24,8 @@ from rest_framework.response import Response
 from .tasks import archive_old_documents, send_single_document_email
 from .validators import DocumentFileValidator
 
+
 User = get_user_model()
-
-
-if TYPE_CHECKING:
-    User = get_user_model()
-    from .models import Document, ApprovalQueue, QueueItem, Folder, DocumentFile
 
 
 class DocumentFilePathGeneratorService:
@@ -43,7 +40,7 @@ class DocumentFilePathGeneratorService:
     def admin_document_path(instance: models.Model, filename: str) -> str:
         """Путь для файлов, загружаемых администраторами"""
 
-        from .models import Document
+        from .models import DocumentFile, Document
 
         if isinstance(instance, DocumentFile):
             admin_id = getattr(instance.document.assigned_admin, "id", "system")
@@ -187,30 +184,30 @@ def get_next_available_admin(exclude_admin: Optional[User] = None) -> Optional[U
 class FolderService:
     """Сервис для работы с папками документов"""
 
-    if TYPE_CHECKING:
-        from .models import Document
+    # from documents.models import Document
 
     @staticmethod
-    def move_to_approved(document: "Document") -> bool:
+    def move_to_approved(document: Any) -> bool:
         """Перемещает в папку одобренных"""
-        from .models import Document
+        # from .models import Document
 
         return FolderService.move_to_folder(document, "approved")
 
     @staticmethod
-    def move_to_rejected(document: "Document") -> bool:
+    def move_to_rejected(document: Any) -> bool:
         """Перемещает в папку отклоненных"""
-        from .models import Document
+        # from .models import Document
 
         return FolderService.move_to_folder(document, "rejected")
 
     @staticmethod
-    def move_to_folder(document: "Document", folder_slug: str) -> bool:
+    def move_to_folder(document: Any, folder_slug: str) -> bool:
         """Перемещает документ в указанную папку"""
 
-        from .models import Folder, Document
+        from .models import Folder
 
         try:
+
             print(f"Попытка перемещения документа {document.id} в папку {folder_slug}")
             folder = Folder.objects.get(slug=folder_slug)
             print(f"Найдена папка: {folder.title}")
@@ -236,10 +233,9 @@ class FolderService:
             return False
 
     @staticmethod
-    def move_to_archive(document: "Document") -> bool:
+    def move_to_archive(document: Any) -> bool:
         """Перемещает в архив"""
-        from .models import Document
-
+        # from .models import Document
         return FolderService.move_to_folder(document, "archived")
 
 
@@ -247,10 +243,10 @@ class DocumentService:
     """Сервис для работы с документами"""
 
     @staticmethod
-    def create_document(validated_data: Dict[str, Any], user: "User", files_data: List[UploadedFile]) -> "Document":
+    def create_document(validated_data: Dict[str, Any], user: User, files_data: List[UploadedFile]) -> Any:
         """Создание документа с бизнес-логикой"""
 
-        from .models import ApprovalQueue, Document, QueueItem
+        from .models import Document, DocumentFile, Folder
 
         if not files_data:
             raise DjangoValidationError("Загрузите хотя бы один файл!")
@@ -300,7 +296,13 @@ class DocumentService:
         return document
 
     @staticmethod
-    def handle_queue_action(item_id: int, user: "User", action: str) -> Dict[str, Any]:
+    def handle_queue_action(
+        item_id: int,
+        user: User,
+        action: str,
+        temp_review_comment: str = "",
+        temp_file_answer: Optional[UploadedFile] = None,
+    ) -> Dict[str, Any]:
         """Обработка действий с документом в очереди (одобрение/отклонение)"""
 
         from .models import QueueItem
@@ -362,10 +364,11 @@ class DocumentService:
             return {"success": False, "message": f"Ошибка: {str(e)}"}
 
     @staticmethod
-    def move_to_new_queue(document: "Document", new_admin: "User") -> bool | None:
+    def move_to_new_queue(document: Any, new_admin: User) -> bool | None:
         """Перемещение документа в другую очередь"""
 
         from .models import QueueItem
+        from .services import QueueService
 
         QueueItem.objects.filter(document=document).delete()
 
@@ -374,7 +377,7 @@ class DocumentService:
 
         return QueueService.add_document_to_queue(document)
 
-    def set_reviewed_at(self, document_id: int) -> "Document":
+    def set_reviewed_at(self, document_id: int) -> Any:
         """Устанавливает время утверждения документа"""
 
         from .models import Document
@@ -392,10 +395,10 @@ class QueueService:
     """Сервис для работы с очередями документов"""
 
     @staticmethod
-    def add_document_to_queue(document: "Document") -> bool | None:
+    def add_document_to_queue(document: Any) -> Optional[bool]:
         """Добавляет документ в очередь с автоматической позицией"""
 
-        from .models import ApprovalQueue, Document, QueueItem
+        from .models import ApprovalQueue, QueueItem
 
         print(f"Попытка добавить документ {document.title} в очередь")
 
@@ -446,10 +449,10 @@ class QueueService:
             return False
 
     @staticmethod
-    def find_suitable_queue_for_document(document: "Document") -> "ApprovalQueue" | None:
+    def find_suitable_queue_for_document(document: Any) -> Optional[Any]:
         """Найти или создать подходящую очередь для документа"""
 
-        from .models import ApprovalQueue, Document
+        from .models import ApprovalQueue
 
         print(f"Попытка определить для документа {document.title} подходящую очередь")
 
@@ -485,7 +488,7 @@ class QueueService:
             return None
 
     @staticmethod
-    def get_or_create_queue(admin: "User") -> Tuple["ApprovalQueue", bool]:
+    def get_or_create_queue(admin: User) -> Tuple[Any, bool]:
         """Получает или создает очередь для администратора"""
 
         from .models import ApprovalQueue
@@ -500,6 +503,7 @@ class QueueService:
         """Реорганизует позиции в очереди после удаления элемента"""
 
         try:
+            from .models import QueueItem
             items = QueueItem.objects.filter(queue=queue_id).order_by("position")
             print(f"Реорганизация очереди {queue_id}, элементов: {items.count()}")
             for index, item in enumerate(items, start=1):
@@ -516,7 +520,7 @@ class QueueService:
             return False
 
     @staticmethod
-    def stop_queue(admin: "User", title_queue: str) -> bool:
+    def stop_queue(admin: User, title_queue: str) -> bool:
         """Останавливает очередь администратора"""
 
         from .models import ApprovalQueue
@@ -530,7 +534,7 @@ class QueueService:
         return False
 
     @staticmethod
-    def resume_queue(admin: "User", title_queue: str) -> bool:
+    def resume_queue(admin: User, title_queue: str) -> bool:
         """Возобновляет работу очереди администратора"""
 
         from .models import ApprovalQueue
