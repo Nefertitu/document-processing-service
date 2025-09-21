@@ -528,23 +528,34 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         "title",
     )
     readonly_fields = ("documents_count", "approver_info")
-    exclude = ["approver_info"]
+    exclude = ["approver"]
 
     inlines = [QueueItemInline]
 
     def change_view(
         self, request: HttpRequest, object_id: str, form_url: str = "", extra_context: Optional[dict[str, Any]] = None
     ) -> HttpResponse:
-        """Скрываем стандартные кнопки в админке"""
+        """Настройка отображения для редактирования существующей очереди"""
 
         extra_context = extra_context or {}
-        extra_context["show_save"] = True
         extra_context["show_save_and_continue"] = False
         extra_context["show_save_and_add_another"] = False
+        extra_context["show_save"] = True
         extra_context["show_close"] = True
-        extra_context["show_add"] = True
 
         return super().change_view(request, object_id, form_url, extra_context)
+
+    def add_view(
+            self, request: HttpRequest, form_url: str = "", extra_context: Optional[dict[str, Any]] = None
+    ) -> HttpResponse:
+        """Настройка отображения для создания новой очереди"""
+
+        extra_context = extra_context or {}
+        extra_context["show_save_and_continue"] = True
+        extra_context["show_save_and_add_another"] = True
+        extra_context["show_save"] = True
+        extra_context["show_close"] = True
+        return super().add_view(request, form_url, extra_context)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[ApprovalQueue]:
         """Получение данных об очереди в зависимости от прав"""
