@@ -1,12 +1,16 @@
 import os
+
+from typing import Any, Dict, Optional, List, Union, Callable
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin import AdminSite
 from django.contrib.auth.models import User
-from django.db.models import Case, Count, IntegerField, Q, QuerySet, When
-from django.http import HttpRequest, HttpResponseRedirect
-from django.urls import path, reverse
+from django.db import models
+from django.db.models import Case, Count, IntegerField, Q, QuerySet, When, Model
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.urls import path, reverse, URLPattern, URLResolver
 from django.utils import timezone
+from django.utils.safestring import SafeString
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
@@ -57,7 +61,7 @@ class DocumentInline(admin.TabularInline):
     list_max_show_all = 100
     show_full_result_count = True
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Document]:
         """
         Получение данных в зависимости от прав.
         Только документы из своих папок (очередей).
@@ -69,7 +73,7 @@ class DocumentInline(admin.TabularInline):
 
         return queryset.filter(assigned_admin=request.user)
 
-    def title_link(self, obj):
+    def title_link(self, obj: Document) -> str:
         """Создает кликабельную ссылку на документ"""
 
         if obj and obj.id:
@@ -80,21 +84,21 @@ class DocumentInline(admin.TabularInline):
     title_link.short_description = "Наименование документа"
     title_link.allow_tags = True
 
-    def review_comment(self, obj):
+    def review_comment(self, obj: Document) -> str:
         """Получить комментарий проверяющего"""
         return obj.document.review_comment
 
     review_comment.short_description = "Комментарий"
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Запрет добавлять элементы вручную"""
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Запрет удаления документов"""
         return False
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Разрешение только на просмотр"""
         return False
 
@@ -119,7 +123,7 @@ class FolderAdmin(admin.ModelAdmin):
 
     inlines = [DocumentInline]
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Folder]:
         """Сохраняем request для использования в других методах"""
 
         queryset = super().get_queryset(request)
@@ -141,11 +145,11 @@ class FolderAdmin(admin.ModelAdmin):
     #     """Запрет добавлять элементы вручную"""
     #     return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Запрет удаления документов"""
         return False
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Разрешение только на просмотр"""
         return False
 
@@ -210,11 +214,11 @@ class DocumentAdmin(admin.ModelAdmin):
     show_full_result_count = True
     extra = 0
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Запрет добавлять элементы вручную"""
         return False
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Document]:
         """
         Получение данных в зависимости от прав.
         Только документы из своих папок (очередей).
@@ -226,11 +230,11 @@ class DocumentAdmin(admin.ModelAdmin):
 
         return queryset.filter(assigned_admin=request.user)
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Запрет удаления документов"""
         return request.user.is_superuser
 
-    def get_reviewed_by(self, obj):
+    def get_reviewed_by(self, obj: Document) -> str:
         """Добавляет информацию о проверившем администраторе"""
 
         if obj and obj.reviewed_by:
@@ -240,7 +244,7 @@ class DocumentAdmin(admin.ModelAdmin):
     get_reviewed_by.short_description = "Проверивший администратор"
     get_reviewed_by.admin_order_field = "reviewed_by__email"
 
-    def get_file_answer(self, obj):
+    def get_file_answer(self, obj: Document) -> SafeString | str:
         """Отображает ответный файл документа"""
 
         if obj.file_answer:
@@ -250,11 +254,13 @@ class DocumentAdmin(admin.ModelAdmin):
     get_file_answer.short_description = "Ответный файл администратора 📌"
     get_file_answer.allow_tags = True
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Разрешение на изменение только своих документов или 'superuser'"""
         return request.user.is_superuser
 
-    def change_view(self, request, object_id, form_url="", extra_context=None):
+    def change_view(
+        self, request: HttpRequest, object_id: str, form_url: str = "", extra_context: Optional[dict[str, Any]] = None
+    ) -> HttpResponse:
         """Скрываем стандартные кнопки в админке"""
 
         extra_context = extra_context or {}
@@ -266,11 +272,13 @@ class DocumentAdmin(admin.ModelAdmin):
 
         return super().change_view(request, object_id, form_url, extra_context)
 
-    def add_view(self, request, form_url="", extra_context=None):
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: Optional[dict[str, Any]] = None
+    ) -> HttpResponse:
         """Перенаправление при попытке доступа к добавлению"""
         return HttpResponseRedirect(reverse("admin:documents_document_changelist"))
 
-    def get_model_perms(self, request):
+    def get_model_perms(self, request: HttpRequest) -> dict[str, bool]:
         """Скрываем кнопку "Добавить" из интерфейса"""
 
         perms = super().get_model_perms(request)
@@ -278,7 +286,7 @@ class DocumentAdmin(admin.ModelAdmin):
         return perms
 
     @admin.action(description="Сменить администратора (авто)")
-    def change_admin_action(self, request, queryset):
+    def change_admin_action(self, request: HttpRequest, queryset: QuerySet[Document]) -> None:
         """
         Изменить администратора для документов.
         Добавить документы выбранному администратору в очередь
@@ -320,7 +328,7 @@ class DocumentAdmin(admin.ModelAdmin):
         else:
             self.message_user(request, "⚠️ Не удалось изменить администратора", messages.WARNING)
 
-    def get_actions(self, request):
+    def get_actions(self, request: HttpRequest) -> Dict[str, Any]:
         """
         Показывать 'change_admin_action' только суперпользователям
         """
@@ -333,7 +341,7 @@ class DocumentAdmin(admin.ModelAdmin):
 
         return actions
 
-    def get_all_files_links(self, obj):
+    def get_all_files_links(self, obj: Document) -> SafeString:
         """Отображение файлов документа"""
         return get_files_display_html(obj.additional_files.all())
 
@@ -373,7 +381,7 @@ class QueueItemInline(admin.TabularInline):
     list_max_show_all = 100
     show_full_result_count = True
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[QueueItem]:
         """Показываем только документы со статусом 'pending'"""
 
         queryset = super().get_queryset(request)
@@ -384,7 +392,7 @@ class QueueItemInline(admin.TabularInline):
             return queryset
         return queryset.filter(document__assigned_admin=request.user)
 
-    def get_status(self, obj):
+    def get_status(self, obj: QueueItem) -> str:
         """Отображает статус документа"""
 
         document = obj.get_document()
@@ -394,7 +402,7 @@ class QueueItemInline(admin.TabularInline):
 
     get_status.short_description = "Статус"
 
-    def get_title(self, obj):
+    def get_title(self, obj: QueueItem) -> str:
         """Отображает название документа"""
 
         document = obj.get_document()
@@ -404,7 +412,7 @@ class QueueItemInline(admin.TabularInline):
 
     get_title.short_description = "Наименование документа"
 
-    def get_all_files_links(self, obj):
+    def get_all_files_links(self, obj: QueueItem) -> SafeString | str:
         """Отображает все файлы документа в очереди"""
 
         if not obj.document:
@@ -414,7 +422,7 @@ class QueueItemInline(admin.TabularInline):
     get_all_files_links.short_description = "Все файлы документа"
     get_all_files_links.allow_tags = True
 
-    def formfield_for_dbfield(self, db_field, request, **kwargs):
+    def formfield_for_dbfield(self, db_field: models.Field, request: HttpRequest, **kwargs: Any) -> forms.Field:
         """Кастомный вид полей"""
 
         if db_field.name == "temp_review_comment":
@@ -428,7 +436,7 @@ class QueueItemInline(admin.TabularInline):
 
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
-    def document_actions(self, obj):
+    def document_actions(self, obj: QueueItem) -> SafeString:
         """Кнопки действий с переносом данных"""
 
         if not obj.document:
@@ -457,7 +465,7 @@ class QueueItemInline(admin.TabularInline):
 
     document_actions.short_description = "Действия"
 
-    def get_readonly_fields(self, request, obj=None):
+    def get_readonly_fields(self, request: HttpRequest, obj: Optional[Model] = None) -> List[Union[str, Callable]]:
         """Определяем какие поля доступны для редактирования"""
 
         print(f"🔍 User: {request.user}")
@@ -485,15 +493,15 @@ class QueueItemInline(admin.TabularInline):
 
         return base_readonly + ["temp_review_comment", "temp_file_answer"]
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Запрет добавлять элементы вручную"""
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Запрет удаления документов"""
         return False
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Разрешение только на просмотр и частичное изменение"""
         return True
 
@@ -519,15 +527,13 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         "approver__full_name",
         "title",
     )
-    readonly_fields = (
-        "created_at",
-        "approver",
-        "documents_count",
-    )
+    readonly_fields = ("documents_count",)
 
     inlines = [QueueItemInline]
 
-    def change_view(self, request, object_id, form_url="", extra_context=None):
+    def change_view(
+        self, request: HttpRequest, object_id: str, form_url: str = "", extra_context: Optional[dict[str, Any]] = None
+    ) -> HttpResponse:
         """Скрываем стандартные кнопки в админке"""
 
         extra_context = extra_context or {}
@@ -539,7 +545,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
 
         return super().change_view(request, object_id, form_url, extra_context)
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[ApprovalQueue]:
         """Получение данных об очереди в зависимости от прав"""
 
         queryset = super().get_queryset(request).prefetch_related("items__document")
@@ -548,7 +554,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
             return queryset
         return queryset.filter(approver=user)
 
-    def get_urls(self):
+    def get_urls(self) -> List[Union[URLPattern, URLResolver]]:
         """Добавляем кастомные URLs для действий"""
 
         urls = super().get_urls()
@@ -569,13 +575,13 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
             print(f"  {url.pattern} -> {url.name}")
         return custom_urls + urls
 
-    def documents_count(self, obj):
+    def documents_count(self, obj: ApprovalQueue) -> int:
         """Возвращает количество документов в очереди текущего администратора"""
         return obj.items.filter(document__status="pending").count()
 
     documents_count.short_description = "Документов в очереди"
 
-    def status_approval(self, obj):
+    def status_approval(self, obj: ApprovalQueue) -> SafeString:
         """Статус с текстом и иконкой"""
 
         if obj.is_stop:
@@ -585,7 +591,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
 
     status_approval.short_description = "Действующая очередь"
 
-    def approve_document(self, request, object_id, item_id):
+    def approve_document(self, request: HttpRequest, object_id: str, item_id: str) -> HttpResponse:
         """Одобрение документа из админки"""
 
         print(f"🟢 APPROVE: object_id={object_id}, item_id={item_id}")
@@ -602,7 +608,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         self._handle_queueitem_action(request, result)
         return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/admin/"))
 
-    def reject_document(self, request, object_id, item_id):
+    def reject_document(self, request: HttpRequest, object_id: str, item_id: str) -> HttpResponse:
         """Отклонение документа из админки"""
 
         print(f"🔴 REJECT: object_id={object_id}, item_id={item_id}")
@@ -618,8 +624,11 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         self._handle_queueitem_action(request, result)
         return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/admin/"))
 
-    def save_model(self, request, obj, form, change):
+    def save_model(self, request: HttpRequest, obj: ApprovalQueue, form: forms.ModelForm, change: bool) -> None:
         """Сохранение в документ с помощью кнопки"""
+
+        if not change:
+            obj.approver = request.user
 
         super().save_model(request, obj, form, change)
 
@@ -717,7 +726,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
 
         return super().response_change(request, obj)
 
-    def _handle_queueitem_action(self, request, result: dict):
+    def _handle_queueitem_action(self, request: HttpRequest, result: dict) -> None:
         """Показ сообщений в админке"""
 
         if result["success"]:
@@ -725,18 +734,18 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         else:
             messages.error(request, result["message"])
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Разрешение удаления очереди"""
         return True
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Разрешение только на просмотр текущему администратору"""
 
         if obj:
             return obj.approver == request.user
         return True
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request: HttpRequest) -> bool:
         """Разрешение добавлять элементы вручную"""
         return True
 
@@ -777,7 +786,7 @@ class QueueItemAdmin(admin.ModelAdmin):
     class Media:
         css = {"all": ("/static/admin/css/custom.css",)}
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[QueueItem]:
         """Показываем только документы со статусом 'pending'"""
 
         queryset = super().get_queryset(request)
@@ -788,14 +797,14 @@ class QueueItemAdmin(admin.ModelAdmin):
             document__isnull=False, document__status="pending", document__assigned_admin=request.user
         )
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request: HttpRequest) -> bool:
         """Запрещаем добавлять элементы вручную"""
         return False
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Запрещаем изменять элементы вручную"""
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request: HttpRequest, obj: Optional[Model] = None) -> bool:
         """Запрет удаления документов"""
         return False

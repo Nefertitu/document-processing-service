@@ -206,6 +206,12 @@ newgrp docker
 - POSTGRES_DB - docs_processing
 - POSTGRES_PORT - 5432
 - POSTGRES_SUPERUSER_PASSWORD - postgres
+- SUPERUSER_EMAIL - email суперпользователя (по умолчанию - "superuser@example.com")
+- SUPERUSER_PASSWORD - пароль для суперпользователя (по умолчанию - "123qwer")
+- SUPERUSER_FIRST_NAME - имя суперпользователя (по умолчанию - "superuser")
+- ADMIN_EMAIL - email администратора
+- ADMIN_PASSWORD - пароль администратора
+- ADMIN_FIRST_NAME - имя администратора
 
 Внесите настройки Вашего SMTP-сервера:
 - EMAIL_HOST
@@ -230,30 +236,28 @@ docker-compose exec web python manage.py csu
 ```
 SUPERUSER_EMAIL=your_email@example.com
 SUPERUSER_PASSWORD=your_secure_password
+SUPERUSER_FIRST_NAME=your_superuser_name
 ```
 
 6. Создание администратора:
 
 ```
-docker-compose exec web python manage.py csu
+docker-compose exec web python manage.py create_admin
 ```
-
-* Данные по умолчанию:
-- **Email**: `superuser@example.com`
-- **Password**: `123qwer`
-
-* Для изменения данных:
-Заполните в файле `.env` (см. шаблон '.env.sample'):
+* Администратор будет создан с данными заполненными в секретах в GitHub:
 ```
-SUPERUSER_EMAIL=your_email@example.com
-SUPERUSER_PASSWORD=your_secure_password
+ADMIN_EMAIL=your_admin_email@example.com
+ADMIN_PASSWORD=your_admin_secure_password
+ADMIN_FIRST_NAME=your_admin_name
 ```
+* Добавьте в Django admin администратору группу 'documents_admin', 
+чтобы дать ему права для работы с документами
 
-6. Создать Группы администраторов с правами с помощью фикстуры: 
+7. Создать Группы администраторов с правами с помощью фикстуры: 
 ```
 docker-compose exec web python manage.py loaddata groups.json
 ```
-7. Проверка работоспособности:
+8. Проверка работоспособности:
 * После деплоя проверьте:
 - Статус контейнеров
 ```
@@ -273,7 +277,7 @@ docker compose exec web ls -la /app/staticfiles/
 ```
 curl -I http://your-server-ip/static/admin/css/base.css
 ```
-8. Доступ к админке:
+9. Доступ к админке:
 
 * Для первого входа выполните команду для создания суперпользователя:
 ```
@@ -281,7 +285,7 @@ docker-compose exec web python manage.py csu
 ```
 * Откройте в браузере: http://your-server-ip/admin/
 
-9. Проверка эндпоинтов:
+10. Проверка эндпоинтов:
 
 - Проверка корневого URL
 ```
@@ -312,6 +316,8 @@ curl http://89.169.166.189/users/ \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
+## Краткое резюме проекта (мнение автора): 
+
 🎯 Особенности реализации
 - Кастомизированный Django Admin - глубокое переопределение стандартной админки
 - Динамические inline-формы с кнопками действий в каждой строке
@@ -327,7 +333,7 @@ curl http://89.169.166.189/users/ \
 - Простота развертывания и поддержки
 - Промышленная надежность на базе Django
 
-🏆 Самое лучшее в проекте
+🏆 Самое лучшее в проекте (по мнению автора ;) )
 - Кнопки действий в строке таблицы - одобрение/отклонение без перехода 
 на детальную страницу
 - Автораспределение документов - умный алгоритм распределения между 
@@ -343,7 +349,7 @@ curl http://89.169.166.189/users/ \
 - Расширяемость - модульная архитектура
 - Документация - Swagger/ReDoc готовы к использованию
 
-🚀 Уникальные фичи
+🚀 Реализованные фичи
 - Система персональных очередей для администраторов
 - Механизм временных полей для черновиков комментариев
 - Динамическое обновление без перезагрузки страницы
