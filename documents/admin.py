@@ -538,6 +538,7 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         """Настройка отображения для редактирования существующей очереди"""
 
         extra_context = extra_context or {}
+        extra_context["show_delete"] = False
         extra_context["show_save_and_continue"] = False
         extra_context["show_save_and_add_another"] = False
         extra_context["show_save"] = False
