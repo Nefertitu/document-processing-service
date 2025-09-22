@@ -540,13 +540,13 @@ class ApprovalQueueAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
         extra_context["show_save_and_continue"] = False
         extra_context["show_save_and_add_another"] = False
-        extra_context["show_save"] = True
+        extra_context["show_save"] = False
         extra_context["show_close"] = True
 
         return super().change_view(request, object_id, form_url, extra_context)
 
     def add_view(
-            self, request: HttpRequest, form_url: str = "", extra_context: Optional[dict[str, Any]] = None
+        self, request: HttpRequest, form_url: str = "", extra_context: Optional[dict[str, Any]] = None
     ) -> HttpResponse:
         """Настройка отображения для создания новой очереди"""
 
