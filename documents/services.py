@@ -87,6 +87,11 @@ class DocumentHeavyProcessingService:
     def optimize_image(image_file: UploadedFile) -> Optional[BytesIO]:
         """Сжимает и оптимизирует изображение"""
 
+        def get_size_info(img_data: BytesIO, prefix: str = "") -> str:
+            """Вспомогательная функция для получения размера в MB"""
+            size_mb = len(img_data.getvalue()) / (1024 * 1024)
+            return f"({size_mb:.2f} MB) {prefix}".strip()
+
         file_size_mb = image_file.size / (1024 * 1024)
 
         if file_size_mb < DocumentHeavyProcessingService.MAX_SIZE_MB:
@@ -96,8 +101,12 @@ class DocumentHeavyProcessingService:
         print(f"⚙️ Оптимизируем: {image_file.name} ({file_size_mb:.1f} MB)")
 
         try:
+            original_buffer = io.BytesIO()
+            original_buffer.write(image_file.read())
+            original_buffer.seek(0)
+
             img = Image.open(image_file)
-            print(f"🖼 Исходный размер: {img.size}, {img.size / (1024 * 1024)} MB")
+            print(f"🖼 Исходный размер: {img.size} пикселей {get_size_info(original_buffer)}")
 
             if (
                 img.size[0] > DocumentHeavyProcessingService.MAX_WIDTH
@@ -107,7 +116,7 @@ class DocumentHeavyProcessingService:
                     (DocumentHeavyProcessingService.MAX_WIDTH, DocumentHeavyProcessingService.MAX_HEIGHT),
                     Image.Resampling.LANCZOS,
                 )
-                print(f"📐 Новый размер: {img.size}, {img.size / (1024 * 1024)} MB")
+                print(f"📐 Новый размер: {img.size} пикселей {get_size_info(original_buffer)}")
 
             output = io.BytesIO()
 
@@ -119,7 +128,12 @@ class DocumentHeavyProcessingService:
                 img.save(output, format=img.format, quality=85, optimize=True)
 
             output.seek(0)
-            print("✅ Оптимизация завершена")
+
+            final_size_mb = len(output.getvalue()) / (1024 * 1024)
+            compression_ratio = (1 - final_size_mb / file_size_mb) * 100
+
+            print(f"✅ Оптимизация завершена: {final_size_mb:.2f} MB")
+            print(f"📊 Сжатие: {compression_ratio:.1f}% экономии")
 
             return output
 
