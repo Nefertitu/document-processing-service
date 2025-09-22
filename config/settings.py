@@ -40,7 +40,7 @@ else:
     ALLOWED_HOSTS = [
         "localhost",
         "127.0.0.1",
-        os.getenv("SERVER_IP", ""),
+        "51.250.110.74",
     ]
 
 
@@ -86,6 +86,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -93,7 +94,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -250,7 +250,9 @@ else:
         "https://51.250.110.74",
     ]
     CSRF_COOKIE_SECURE = True
+
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS
 
 
