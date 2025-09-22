@@ -780,8 +780,8 @@ class QueueItemAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "position",
-        "queue",
         "document",
+        "queue",
         "added_at",
         # "document_file",
         "temp_review_comment",
