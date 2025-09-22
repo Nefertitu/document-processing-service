@@ -40,9 +40,32 @@ else:
     ALLOWED_HOSTS = [
         "localhost",
         "127.0.0.1",
+        "0.0.0.0",
         "51.250.110.74",
     ]
 
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+    "https://51.250.110.74",
+    "http://51.250.110.74",
+]
+CSRF_COOKIE_SECURE = True
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS
+
+CSRF_COOKIE_SECURE = False  # False для HTTP, True для HTTPS
+CSRF_COOKIE_HTTPONLY = False  # Должен быть False для доступа из JS
+CSRF_USE_SESSIONS = False
+
+SESSION_COOKIE_SECURE = False  # False для HTTP, True для HTTPS
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
 
 REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": [
@@ -50,7 +73,10 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
         "rest_framework.filters.SearchFilter",
     ],
-    "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ),
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
@@ -61,6 +87,7 @@ REST_FRAMEWORK = {
 
 
 INSTALLED_APPS = [
+    "corsheaders",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -80,7 +107,6 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "drf_yasg",
     "django_celery_beat",
-    "corsheaders",
     "users",
     "documents",
 ]
@@ -101,7 +127,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -231,29 +257,6 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 CSRF_COOKIE_HTTPONLY = True
-
-if DEBUG:
-    CSRF_TRUSTED_ORIGINS = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://51.250.110.74",
-        "https://51.250.110.74",
-    ]
-    CSRF_COOKIE_SECURE = False
-
-else:
-    CSRF_TRUSTED_ORIGINS = [
-        "http://localhost:8000",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://51.250.110.74",
-    ]
-    CSRF_COOKIE_SECURE = True
-
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS
 
 
 HEALTH_CHECK = {
