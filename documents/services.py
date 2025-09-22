@@ -132,7 +132,7 @@ class DocumentHeavyProcessingService:
             final_size_mb = len(output.getvalue()) / (1024 * 1024)
             compression_ratio = (1 - final_size_mb / file_size_mb) * 100
 
-            print(f"✅ Оптимизация завершена: новый размер ({new_size}) {final_size_mb:.2f} MB")
+            print(f"✅ Новый размер ({new_size}) {final_size_mb:.2f} MB")
             print(f"📊 Сжатие: {compression_ratio:.1f}% экономии")
 
             return output
