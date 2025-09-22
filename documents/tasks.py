@@ -23,7 +23,9 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
 
     try:
         document = Document.objects.get(id=document_id)
-        print(f"🎯 START: Задача отправки сообщения о документе: {document.pk} {document.title} {document.status}")
+        print(
+            f"🎯 START: Задача отправки сообщения о документе: {document.pk} '{document.title}', статус: {document.status}"
+        )
 
         comment = document.review_comment
 

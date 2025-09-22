@@ -97,7 +97,7 @@ class DocumentHeavyProcessingService:
 
         try:
             img = Image.open(image_file)
-            print(f"🖼 Исходный размер: {img.size}")
+            print(f"🖼 Исходный размер: {img.size}, {img.size / (1024 * 1024)} MB")
 
             if (
                 img.size[0] > DocumentHeavyProcessingService.MAX_WIDTH
@@ -107,7 +107,7 @@ class DocumentHeavyProcessingService:
                     (DocumentHeavyProcessingService.MAX_WIDTH, DocumentHeavyProcessingService.MAX_HEIGHT),
                     Image.Resampling.LANCZOS,
                 )
-                print(f"📐 Новый размер: {img.size}")
+                print(f"📐 Новый размер: {img.size}, {img.size / (1024 * 1024)} MB")
 
             output = io.BytesIO()
 
