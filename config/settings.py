@@ -1,10 +1,9 @@
 import os
 import sys
-
-import dj_database_url
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -16,36 +15,49 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 
 DEBUG = True if os.getenv("DEBUG") == "True" else False
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": os.getenv("DATABASE_NAME"),
-        "USER": os.getenv("DATABASE_USER"),
-        "PASSWORD": os.getenv("DATABASE_PASSWORD"),
-        "HOST": os.getenv("DATABASE_HOST"),
-        "PORT": os.getenv("DATABASE_PORT", default="5432"),
-    }
-}
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql_psycopg2",
+#         "NAME": os.getenv("DATABASE_NAME"),
+#         "USER": os.getenv("DATABASE_USER"),
+#         "PASSWORD": os.getenv("DATABASE_PASSWORD"),
+#         "HOST": os.getenv("DATABASE_HOST"),
+#         "PORT": os.getenv("DATABASE_PORT", default="5432"),
+#     }
+# }
 
-# if DEBUG:
-#     ALLOWED_HOSTS = ["*"]
-# else:
-#     ALLOWED_HOSTS = [
-#         "localhost",
-#         "127.0.0.1",
-#         os.getenv("SERVER_IP"),
-#     ]
-#
-# if DEBUG:
-#     REST_FRAMEWORK = {
-#         "DEFAULT_FILTER_BACKENDS": [
-#             "django_filters.rest_framework.DjangoFilterBackend",
-#         ],
-#         "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
-        # "DEFAULT_PERMISSION_CLASSES": [
-    #     #     "rest_framework.permissions.IsAuthenticated",
-    #     "DEFAULT_PERMISSION_CLASSES": [],
-    # }
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@{os.getenv("POSTGRES_HOST")}:5432/{os.getenv("POSTGRES_DB")}",
+)
+DATABASES = {"default": dj_database_url.config(default=DATABASE_URL)}
+
+
+if DEBUG:
+    ALLOWED_HOSTS = ["*"]
+else:
+    ALLOWED_HOSTS = [
+        "localhost",
+        "127.0.0.1",
+        "51.250.110.74",
+    ]
+
+
+REST_FRAMEWORK = {
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.OrderingFilter",
+        "rest_framework.filters.SearchFilter",
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    # "DEFAULT_PERMISSION_CLASSES": [],
+    "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
+    "USE_TZ": True,
+}
 
 
 INSTALLED_APPS = [
@@ -55,7 +67,14 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    #other apps
+    # other apps
+    "health_check",
+    "health_check.db",
+    "health_check.cache",
+    "health_check.storage",
+    "health_check.contrib.migrations",
+    "health_check.contrib.celery",
+    "health_check.contrib.redis",
     "rest_framework",
     "django_filters",
     "rest_framework_simplejwt",
@@ -63,9 +82,11 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "corsheaders",
     "users",
+    "documents",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -73,7 +94,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -96,13 +116,6 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@{os.getenv("POSTGRES_HOST")}:5432/{os.getenv("POSTGRES_DB")}",
-)
-DATABASES = {"default": dj_database_url.config(default=DATABASE_URL)}
-
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -119,23 +132,20 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "ru-ru"
 
 TIME_ZONE = "Europe/Moscow"
 
 USE_I18N = True
-
+USE_L10N = True
 USE_TZ = True
 
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-if DEBUG:
-    STATICFILES_DIRS = [BASE_DIR / "static"]
-else:
-    STATICFILES_DIRS = []
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 MEDIA_URL = "/media/"
 
@@ -151,7 +161,10 @@ if CACHE_ENABLED:
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": os.getenv("LOCATION"),
             "TIMEOUT": 300,
-            "KEY_PREFIX": "mailing_service",
+            # "KEY_PREFIX": "document_service",
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
         }
     }
 
@@ -163,23 +176,35 @@ if "test" in sys.argv:
     }
     CELERY_BROKER_URL = "memory://"
     CELERY_RESULT_BACKEND = "cache+memory://"
-    TELEGRAM_BOT_TOKEN = "test-token"
+    CELERY_ACCEPT_CONTENT = ["json"]
+    CELERY_TASK_SERIALIZER = "json"
 else:
     CELERY_BROKER_URL = os.getenv("LOCATION")
     CELERY_RESULT_BACKEND = os.getenv("LOCATION")
-    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+    CELERY_ACCEPT_CONTENT = ["json"]
+    CELERY_TASK_SERIALIZER = "json"
 
 
 AUTH_USER_MODEL = "users.User"
 
+LOGIN_REDIRECT_URL = "/admin/"
+
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-CELERY_TASK_ANNOTATIONS = {"habits.tasks.send_reminder": {"default_retry_delay": 300, "max_retries": 2}}
 
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+CELERY_BEAT_SCHEDULE = {
+    "archive_old_documents_daily": {
+        "task": "documents.tasks.archive_old_documents",
+        # "schedule": timedelta(days=1),  # Каждый день
+        "schedule": timedelta(minutes=5),  # Для тестирования - каждые 5 минут
+    },
+}
 
 CELERY_TASK_QUEUES = {
     "celery": {
@@ -192,7 +217,7 @@ CELERY_TASK_DEFAULT_QUEUE = "celery"
 CELERY_TASK_CREATE_MISSING_QUEUES = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-CELERY_TIMEZONE = "UTC"
+CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
 
@@ -205,16 +230,90 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+CSRF_COOKIE_HTTPONLY = True
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://localhost:8000",
-]
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://51.250.110.74",
+        "https://51.250.110.74",
+    ]
+    CSRF_COOKIE_SECURE = False
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8000",
-]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:8000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://51.250.110.74",
+    ]
+    CSRF_COOKIE_SECURE = True
 
+CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS
 
 
+HEALTH_CHECK = {
+    "DISK_USAGE_MAX": 90,  # Максимальное использование диска в %
+    "MEMORY_MIN": 100,  # Минимальная свободная память в MB
+}
+
+if not DEBUG:
+    # Настройки для Yandex Cloud Object Storage
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+    # Yandex Cloud специфичные настройки
+    AWS_ACCESS_KEY_ID = os.getenv("YC_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("YC_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.getenv("YC_BUCKET_NAME")
+    AWS_S3_ENDPOINT_URL = "https://storage.yandexcloud.net"
+    AWS_S3_REGION_NAME = "ru-central1"
+
+    # Важные настройки для совместимости с Yandex Cloud
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_DEFAULT_ACL = "public-read"
+    AWS_QUERYSTRING_AUTH = False
+
+    # Дополнительные настройки
+    AWS_S3_OBJECT_PARAMETERS = {
+        "CacheControl": "max-age=86400",
+    }
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB в байтах
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB в байтах
+
+SWAGGER_SETTINGS = {
+    "SECURITY_DEFINITIONS": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "JWT Token. Example: 'Bearer {token}'",
+        }
+    },
+    "USE_SESSION_AUTH": False,
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        "documents": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+        },
+    },
+}

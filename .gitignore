@@ -6,6 +6,17 @@ __pycache__/
 # C extensions
 *.so
 
+# Игнорировать всё в media кроме .gitkeep файлов
+media/*
+!media/.gitkeep
+!media/*/.gitkeep
+!media/*/*/.gitkeep
+
+# Конкретные исключения для структуры
+!media/documents/.gitkeep
+!media/temp_uploads/.gitkeep
+!media/temp_answers/.gitkeep
+
 # Distribution / packaging
 .Python
 build/
@@ -126,9 +137,20 @@ celerybeat-schedule
 # SageMath parsed files
 *.sage.py
 
+# Local settings
+config/local_settings.py
+*.local_settings.py
+local_settings.py
+
+# IDE
+.vscode/
+.idea/
+
 # Environments
 .ini
 .env
+.env.local
+.env.*.local
 .venv
 env/
 venv/
@@ -170,3 +192,7 @@ cython_debug/
 #node_modules/
 #npm-debug.log
 #.yarn-integrity
+media/temp_*
+
+# Django static files
+staticfiles/

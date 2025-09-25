@@ -1,0 +1,124 @@
+services:
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py collectstatic --noinput && \
+          python manage.py migrate && \
+          gunicorn config.wsgi:application --bind 0.0.0.0:8000
+      "
+    environment:
+      - DEBUG=True
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_PORT=5432
+      - DJANGO_SETTINGS_MODULE=config.settings
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - .:/app
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    user: appuser
+    restart: unless-stopped
+    healthcheck:
+#      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
+      test: ["CMD", "nc", "-z", "localhost", "8000"]
+#      test: [ "CMD-SHELL", "exit 0" ]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 60s
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media
+    depends_on:
+      - web
+#      web:
+#        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:6.2
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    user: "999:1004"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 30s
+      retries: 5
+
+  celery:
+    build: .
+    command: poetry run celery -A config worker -c 50 --loglevel=info
+    env_file: .env
+    volumes:
+      - .:/app
+      - media_volume:/app/media
+    depends_on:
+      - db
+      - redis
+    user: appuser
+    working_dir: /app
+    environment:
+      - C_FORCE_ROOT=false
+      - DJANGO_SETTINGS_MODULE=config.settings
+    restart: unless-stopped
+
+  celery-beat:
+    build: .
+    command: poetry run celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file: .env
+    volumes:
+      - .:/app
+      - media_volume:/app/media
+      - celery_beat_volume:/var/celerybeat-schedule
+    depends_on:
+      - db
+      - redis
+    user: appuser
+    working_dir: /app
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  celery_beat_volume:
+  static_volume:
+  media_volume:

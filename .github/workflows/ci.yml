@@ -1,0 +1,270 @@
+name: Django CI
+
+on: [ push, pull_request ]
+
+env:
+  SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+      - name: Sync files to server
+        run: |    
+          rsync -avz --rsync-path="sudo rsync" --delete \
+           -e "ssh -i private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+           ./ \
+           ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:/opt/document_service/
+          
+          rm -f private_key
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pypoetry
+            .venv
+          key: poetry-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install dependencies
+        run: poetry install --no-root
+
+      - name: Create static directory
+        run: mkdir -p static
+
+      - name: Create media directory
+        run: mkdir -p media
+
+      - name: Run linting
+        run: poetry run flake8 .
+
+  test:
+    needs: setup
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_SUPERUSER_PASSWORD: ${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pypoetry
+            .venv
+          key: poetry-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-ansi --no-root
+
+      - name: Wait to PostgreSQL to be ready
+        run: |
+          while ! nc -z localhost 5433; do
+            echo "Waiting for PostgreSQL..."
+            sleep 1
+          done
+
+      - name: Run migrations
+        run: |
+          poetry run python manage.py migrate --no-input
+        env:
+          DATABASE_URL: "postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5433/${{ secrets.POSTGRES_DB }}"
+
+      - name: Verify DB connection
+        run: |
+          psql "postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5433/${{ secrets.POSTGRES_DB }}" -c "SELECT 1;"
+
+      - name: Run tests
+        run: poetry run python manage.py test
+        env:
+          DATABASE_URL: "postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5433/${{ secrets.POSTGRES_DB }}"
+          REDIS_URL: "redis://localhost:6379/0"
+          CELERY_BROKER_URL: "redis://localhost:6379/0"
+          CELERY_RESULT_BACKEND: "redis://localhost:6379/0"
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/document_service:${{ github.sha }} .
+
+      - name: Push Docker image to Docker Hub
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/document_service:${{ github.sha }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH-agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "echo 'SSH connection successful'"
+#          cd /opt/document_service
+#          docker-compose up -d --build
+#          "
+
+      - name: Install Docker Compose on remote
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "
+          if ! dpkg -s docker-compose-plugin >/dev/null 2>&1; then
+            sudo apt update && \
+            sudo apt install -y docker-compose-plugin
+          fi
+          if [ ! -f /usr/local/bin/docker-compose ]; then
+            sudo ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+          fi
+          docker-compose version
+          "
+
+      - name: Create directories and set permissions
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "
+          set -e
+          sudo mkdir -p /opt/document_service/{postgres_data,redis_data,celery_beat_volume} && \
+          sudo chown -R ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} /opt/document_service && \
+          sudo chown -R 999:999 /opt/document_service/postgres_data && \
+          sudo chown -R 100:101 /opt/document_service/redis_data && \
+          ls -la /opt/document_service
+          "
+
+      - name: Show current directory
+        run: |
+          echo "Current directory: $(pwd)"
+          ls -la
+          echo "Workspace: $GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE"
+          ls -la
+
+      - name: Show branch info
+        run: |
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Ref: ${{ github.ref }}"
+
+      - name: Copy project files
+        run: |
+          rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./* \
+            ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:/opt/document_service/
+
+      - name: Deploy with Docker Compose
+        run: |
+          ssh -o StrictHostKeyChecking=no -i <(echo "${{ secrets.SSH_KEY }}") \
+          ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "
+          set -e
+          cd /opt/document_service || { echo 'Error: Directory not found'; exit 1; }
+          [ -f docker-compose.yml ] || { echo 'Error: docker-compose.yml not found'; ls -la; exit 1; }
+          
+          > /opt/document_service/.env
+          
+          echo 'POSTGRES_USER=${{ secrets.POSTGRES_USER }}' >> /opt/document_service/.env
+          echo 'SUPERUSER_EMAIL=${{ secrets.SUPERUSER_EMAIL }}' >> /opt/document_service/.env
+          echo 'SUPERUSER_PASSWORD=${{ secrets.SUPERUSER_PASSWORD }}' >> /opt/document_service/.env
+          echo 'SUPERUSER_FIRST_NAME=${{ secrets.SUPERUSER_FIRST_NAME }}' >> /opt/document_service/.env
+          echo 'ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}' >> /opt/document_service/.env
+          echo 'ADMIN_FIRST_NAME=${{ secrets.ADMIN_FIRST_NAME }}' >> /opt/document_service/.env
+          echo 'ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}' >> /opt/document_service/.env
+          echo 'POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}' >> /opt/document_service/.env
+          echo 'POSTGRES_DB=${{ secrets.POSTGRES_DB }}' >> /opt/document_service/.env
+          echo 'SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}' >> /opt/document_service/.env
+          echo 'POSTGRES_SUPERUSER_PASSWORD=${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}' >> /opt/document_service/.env
+          echo "POSTGRES_HOST=db" >> /opt/document_service/.env
+          echo "POSTGRES_PORT=5432" >> /opt/document_service/.env
+          echo "EMAIL_HOST=${{ secrets.EMAIL_HOST }}" >> /opt/document_service/.env
+          echo "EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}" >> /opt/document_service/.env
+          echo "EMAIL_HOST_USER=${{ secrets.EMAIL_HOST_USER }}" >> /opt/document_service/.env
+          echo "EMAIL_PORT=${{ secrets.EMAIL_PORT }}" >> /opt/document_service/.env
+          echo "EMAIL_USE_SSL=${{ secrets.EMAIL_USE_SSL }}" >> /opt/document_service/.env
+          echo "EMAIL_USE_TLS=${{ secrets.EMAIL_USE_TLS }}" >> /opt/document_service/.env
+          echo "CELERY_BROKER_URL=redis://redis:6379/1" >> /opt/document_service/.env
+          echo "CELERY_RESULT_BACKEND=redis://redis:6379/1" >> /opt/document_service/.env
+          echo "DEBUG=False" >> /opt/document_service/.env
+          echo "SERVER_IP=${{ secrets.SERVER_IP }}" >> /opt/document_service/.env
+          echo "ALLOWED_HOSTS=localhost,127.0.0.1,${{ secrets.SERVER_IP }}"  >> /opt/document_service/.env
+          
+          docker-compose down
+          docker-compose up -d --build
+          docker ps -a
+          "
+
+      - name: Apply migrations on production
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "
+          cd /opt/document_service
+          docker-compose exec web python manage.py migrate --no-input
+          docker-compose exec web python manage.py collectstatic --no-input
+          echo 'Deployment completed successfully!'
+          "

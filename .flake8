@@ -11,3 +11,6 @@ exclude =
     migrations
 ignore = E501,E503,W503,F401
 max-line-length = 119
+
+per-file-ignores =
+    config/local_settings.py: F403
