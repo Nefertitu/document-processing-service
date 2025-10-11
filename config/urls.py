@@ -10,7 +10,7 @@ from rest_framework.authtoken.views import obtain_auth_token
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Snippets API",
+        title="document-processing-service",
         default_version="v1",
         description="Test description",
         terms_of_service="https://www.google.com/policies/terms/",

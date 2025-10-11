@@ -286,6 +286,9 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB в байтах
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB в байтах
 
 SWAGGER_SETTINGS = {
+    "title": "document-processing-service",
+    "DESCRIPTION": "API-application - service for processing uploaded documents",
+    "VERSION": "1.0.0",
     "SECURITY_DEFINITIONS": {
         "Bearer": {
             "type": "apiKey",
