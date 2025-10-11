@@ -1,5 +1,9 @@
 FROM nginx:latest
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    adduser \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN adduser --disabled-password --gecos '' appuser
 
 RUN mkdir -p /app/staticfiles && \
