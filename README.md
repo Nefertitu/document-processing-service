@@ -121,10 +121,10 @@ docker-compose exec web python manage.py csu
 
 ## Настройка виртуальной машины (предварительная подготовка для деплоя):
 
-** Предварительные требования:
-- Yandex Cloud аккаунт
-- Доступ по SSH
-- Ubuntu 22.04 LTS или новее
+* Предварительные требования:
+- Учетная запись у любого облачного провайдера (например, *Yandex Cloud*, *Selectel*, *Timeweb Cloud* и др. )
+- Созданная виртуальная машина (ВМ) с операционой системой **Ubuntu 22.04 LTS** (или новее)
+- Настроенный доступ к ВМ по SSH-ключу
 
 1. Пошаговая настройка
 
@@ -275,7 +275,7 @@ docker compose exec web ls -la /app/staticfiles/
 ```
 * Проверьте доступность через браузер
 ```
-curl -I http://your-server-ip/static/admin/css/base.css
+curl -I http://<your_server_ip>/static/admin/css/base.css
 ```
 9. Доступ к админке:
 
@@ -283,36 +283,36 @@ curl -I http://your-server-ip/static/admin/css/base.css
 ```
 docker-compose exec web python manage.py csu
 ```
-* Откройте в браузере: http://your-server-ip/admin/
+* Откройте в браузере: http://<your_server_ip>/admin/
 
 10. Проверка эндпоинтов:
 
 - Проверка корневого URL
 ```
-curl http://your-server-ip/
+curl http://<your_server_ip>/
 ```
 - JWT аутентификация
 * Получение JWT токена
 ```
-curl -X POST http://89.169.166.189/users/login/ \
+curl -X POST http://<your_server_ip>/users/login/ \
   -H "Content-Type: application/json" \
   -d '{"email":"superuser@example.com","password":"123qwer"}'
 ```
 * Обновление токена  
 ```
-curl -X POST http://89.169.166.189/users/token/refresh/ \
+curl -X POST http://<your_server_ip>/users/token/refresh/ \
   -H "Content-Type: application/json" \
   -d '{"refresh":"your_refresh_token"}'
 ```
 - Регистрация
 ```
-curl -X POST http://89.169.166.189/users/register/ \
+curl -X POST http://<your_server_ip>/users/register/ \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"testpassword","password2":"testpassword"}'
 ```
 - Просмотр пользователей:
 ```
-curl http://89.169.166.189/users/ \
+curl http://<your_server_ip>/users/ \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -359,4 +359,9 @@ curl http://89.169.166.189/users/ \
 минимальными требованиями к инфраструктуре! 🎯
 
 
-## Приложение развернуто на VM на server-ip: http://51.250.110.74/ 
+## Лицензия
+Этот проект лицензирован по [лицензии MIT]
+
+
+## Разработчик
+[Казорина Ольга - https://github.com/Nefertitu/]
