@@ -1,33 +1,31 @@
 [
   {
   "model": "auth.group",
-  "pk": 1,
   "fields": {
     "name": "documents_admin",
     "permissions": [
-      55,
-      56,
-      57,
-      58,
-      64,
-      65,
-      62,
-      79,
-      69,
-      74,
-      75,
-      73
+      ["view_document", "documents", "document"],
+      ["view_folder", "documents", "folder"],
+      ["add_approvalqueue", "documents", "approvalqueue"],
+      ["change_approvalqueue", "documents", "approvalqueue"],
+      ["delete_approvalqueue", "documents", "approvalqueue"],
+      ["view_approvalqueue", "documents", "approvalqueue"],
+      ["change_queueitem", "documents", "queueitem"],
+      ["view_queueitem", "documents", "queueitem"],
+      ["can_approve_document", "documents", "document"],
+      ["can_reject_document", "documents", "document"],
+      ["can_review_documents", "documents", "queueitem"],
+      ["can_upload_answer_file", "documents", "queueitem"]
     ]
   }
 },
 {
   "model": "auth.group",
-  "pk": 2,
   "fields": {
     "name": "users_admin",
     "permissions": [
-      54,
-      53
+      ["can_view_all_users", "users", "user"],
+      ["can_delete_user", "users", "user"]
     ]
   }
 }

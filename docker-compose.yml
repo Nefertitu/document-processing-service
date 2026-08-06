@@ -14,6 +14,13 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_PORT=5432
       - DJANGO_SETTINGS_MODULE=config.settings
+      - SERVICE_NAME=web
+      # Управление инициализацией через переменные
+      - SKIP_MIGRATIONS=false
+      - SKIP_FIXTURES=false
+      - SKIP_ADMIN_CREATION=false
+      - SKIP_SUPERUSER=false
+      - SKIP_COLLECTSTATIC=false
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
@@ -84,7 +91,7 @@ services:
 
   celery:
     build: .
-    command: poetry run celery -A config worker -c 50 --loglevel=info
+    command: celery -A config worker -c 50 --loglevel=info
     env_file: .env
     volumes:
       - .:/app
@@ -101,7 +108,7 @@ services:
 
   celery-beat:
     build: .
-    command: poetry run celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file: .env
     volumes:
       - .:/app

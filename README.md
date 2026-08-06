@@ -46,19 +46,13 @@
 8. **Тестирование**: 
    - Код должен быть покрыт тестами с покрытием не менее 75%.
 
+**Локальная установка**
 
 ## Локальная установка и запуск проекта через Docker Compose
 
 1. Клонируйте репозиторий:
 ```
 git clone https://github.com/Nefertitu/document-processing-service
-```
-или
-```
-git clone git@github.com:Nefertitu/document-processing-service.git
-```
-
-```
 cd document-processing-service
 ```
 
@@ -67,63 +61,44 @@ cd document-processing-service
    cp .env.sample .env
    ```
    
-2. Запустите проект:
+3. Запустите проект:
     ```
-    docker-compose build --no-cache
-    docker-compose up -d
+    docker compose up -d --build
     ```
    
-3. Проверьте работоспособность (проверка логов):
+4. При первом запуске автоматически выполняются:
+
+✅ Миграции базы данных
+
+✅ Загрузка групп прав из groups.json
+
+✅ Создание суперпользователя и администратора
+
+✅ Сбор статических файлов
+
+5. Проверьте работоспособность:
 
 - Откройте в браузере: http://localhost:8000
 
-- База данных: 
-```
-   docker-compose logs db
+- Админка: http://localhost:8000/admin/
 
+6. Для просмотра логов:
 ```
-```
-  docker-compose exec db psql -U your_user -d your_db
-```
-
-- Redis:
-```
-   docker-compose logs redis
-```
-```
-   docker-compose exec redis redis-cli ping
-```
-
-- Celery: 
-```
-   docker-compose logs celery
-```
-```
-   docker-compose exec celery celery -A config status
-
+   docker compose logs web
+   docker compose logs db
+   docker compose logs redis
+   docker compose logs celery
+   docker compose logs celery-beat
 ```
 
 
-- Celery Beat: 
-```
-   docker-compose logs celery-beat
-```
-
-- Выполните миграции и создайте суперпользователя:
-```
-docker-compose exec web python manage.py migrate
-```
-```
-docker-compose exec web python manage.py csu
-```
-- Откройте в браузере: http://localhost:8000/admin/
-
+**Деплой на ВМ:**
 
 ## Настройка виртуальной машины (предварительная подготовка для деплоя):
 
 * Предварительные требования:
 - Учетная запись у любого облачного провайдера (например, *Yandex Cloud*, *Selectel*, *Timeweb Cloud* и др. )
-- Созданная виртуальная машина (ВМ) с операционой системой **Ubuntu 22.04 LTS** (или новее)
+- Созданная виртуальная машина (ВМ) с операционной системой **Ubuntu 22.04 LTS** (или новее)
 - Настроенный доступ к ВМ по SSH-ключу
 
 1. Пошаговая настройка
@@ -136,17 +111,22 @@ ssh username@your-vm-ip
 ```
 sudo apt update && sudo apt upgrade -y
 ```
-* Установка Docker
+* Установка Docker и Git:
 ```
-(sudo apt install docker.io docker-compose-plugin -y)
-установка отдельно:
-sudo apt install docker.io -y
-sudo apt-get install -y curl
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-docker-compose --version
-sudo systemctl enable docker
-sudo systemctl start docker
+# 1. Удалите старый Docker, если он был
+sudo apt remove docker docker-engine docker.io containerd runc
+
+# 2. Установите Docker и плагин Compose (рекомендуемый способ)
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# 3. Добавьте пользователя в группу docker (чтобы не использовать sudo)
+sudo usermod -aG docker $USER
+newgrp docker
+
+# 4. Проверьте установку
+docker --version
+docker compose version
 ```
 * Установка Python
 ```
@@ -168,33 +148,16 @@ newgrp docker
 
 При push в ветку `development` автоматически запускается CI/CD pipeline который:
 
-✅ Тестирует код
-✅ Собирает Docker образы  
-✅ Деплоит на сервер
-✅ Применяет миграции
-✅ Собирает статические файлы
-✅ Перезапускает сервисы
+✅ Запускаются тесты
+✅ Собираются Docker-образы
+✅ Образы загружаются в Docker Hub
+✅ На ВМ выполняются миграции, сборка статики и перезапуск сервисов
 
-*Подробнее в [.github/workflows/ci.yml](.github/workflows/ci.yml)*
+Настройка:
 
+1. Форкните репозиторий → https://github.com/Nefertitu/document-processing-service
 
-1. Форкните репозиторий
-Перейдите на https://github.com/Nefertitu/document-processing-service и нажмите "Fork"
-
-2. Настройте сервер (Docker + Git)
-```
-ssh your_username@your_server_ip
-```
-
-3. Установите Docker и Git:
-```
-sudo apt update && sudo apt install docker.io docker-compose-plugin git -y
-sudo usermod -aG docker $USER
-newgrp docker
-```
-4. Настройте секреты в GitHub:
-* В вашем форкнутом репозитории перейдите в Settings → Secrets → Actions
-* Добавьте следующие секреты:
+2. Настройте секреты в GitHub → Settings → Secrets → Actions:
 - DJANGO_SECRET_KEY - секретный ключ Django, можно сгенерировать: openssl rand -base64 32
 - DOCKER_HUB_TOKEN - Токен из Docker Hub account settings
 - DOCKER_HUB_USERNAME - Username из Docker Hub account settings
@@ -221,43 +184,44 @@ newgrp docker
 - EMAIL_HOST_USER
 - EMAIL_HOST_PASSWORD
 
-5. Создание суперпользователя:
-
-```
-docker-compose exec web python manage.py csu
-```
+Все переменные, включая ADMIN_* и SUPERUSER_*, передаются в контейнер через .env и
+используются автоматически при инициализации.
 
 * Данные по умолчанию:
 - **Email**: `superuser@example.com`
 - **Password**: `123qwer`
 
 * Для изменения данных:
-Заполните в файле `.env` (см. шаблон '.env.sample'):
+Заполните в файле `.env` (см. шаблон '.env.sample')
+- Администратор и суперпользователь будут созданы с данными, 
+заполненными в секретах в GitHub
+
+## Ручной деплой (без CI/CD)
+
+1. Клонируйте репозиторий
 ```
-SUPERUSER_EMAIL=your_email@example.com
-SUPERUSER_PASSWORD=your_secure_password
-SUPERUSER_FIRST_NAME=your_superuser_name
+git clone https://github.com/Nefertitu/document-processing-service
+cd document-processing-service
+```
+2. Создайте .env файл
+```
+cp .env.sample .env
+nano .env   # заполните переменные
+```
+3. Запустите контейнеры
+```
+docker compose up -d --build
 ```
 
-6. Создание администратора:
+*После запуска автоматически:*
 
-```
-docker-compose exec web python manage.py create_admin
-```
-* Администратор будет создан с данными заполненными в секретах в GitHub:
-```
-ADMIN_EMAIL=your_admin_email@example.com
-ADMIN_PASSWORD=your_admin_secure_password
-ADMIN_FIRST_NAME=your_admin_name
-```
-* Добавьте в Django admin администратору группу 'documents_admin', 
-чтобы дать ему права для работы с документами
+- Выполнятся миграции
+- Загрузятся группы прав (groups.json)
+- Создадутся суперпользователь и администратор
+- Оба пользователя будут добавлены в группу documents_admin
 
-7. Создать Группы администраторов с правами с помощью фикстуры: 
-```
-docker-compose exec web python manage.py loaddata groups.json
-```
-8. Проверка работоспособности:
+
+**Проверка работоспособности:**
 * После деплоя проверьте:
 - Статус контейнеров
 ```
@@ -267,31 +231,15 @@ docker-compose ps
 ```
 docker-compose logs web
 ```
-
-- Проверка статистических файлов
-* Посмотрите что в папке staticfiles
+- Проверка статики
 ```
 docker compose exec web ls -la /app/staticfiles/
-```
-* Проверьте доступность через браузер
-```
 curl -I http://<your_server_ip>/static/admin/css/base.css
 ```
-9. Доступ к админке:
+- Доступ к админке: http://<your_server_ip>/admin/
 
-* Для первого входа выполните команду для создания суперпользователя:
-```
-docker-compose exec web python manage.py csu
-```
-* Откройте в браузере: http://<your_server_ip>/admin/
+- Проверка эндпоинтов:
 
-10. Проверка эндпоинтов:
-
-- Проверка корневого URL
-```
-curl http://<your_server_ip>/
-```
-- JWT аутентификация
 * Получение JWT токена
 ```
 curl -X POST http://<your_server_ip>/users/login/ \
@@ -316,10 +264,253 @@ curl http://<your_server_ip>/users/ \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-## Краткое резюме проекта (мнение автора): 
+## Теестирование
+### Тестирование при локальном запуске:
+```
+make test
+make coverage
+```
 
-🎯 Особенности реализации
+coverage report
+Name                                                                                        Stmts   Miss  Cover
+---------------------------------------------------------------------------------------------------------------
+config/__init__.py                                                                              2      0   100%
+config/asgi.py                                                                                  4      4     0%
+config/celery.py                                                                                9      0   100%
+config/local_settings.py                                                                        2      0   100%
+config/settings.py                                                                             91     17    81%
+config/urls.py                                                                                 16      3    81%
+config/wsgi.py                                                                                  4      4     0%
+documents/__init__.py                                                                           0      0   100%
+documents/admin.py                                                                            389    208    47%
+documents/apps.py                                                                              12      0   100%
+documents/migrations/0001_initial.py                                                            6      0   100%
+documents/migrations/0002_initial.py                                                            7      0   100%
+documents/migrations/0003_approvalqueue_is_stop_alter_document_reviewed_at.py                   4      0   100%
+documents/migrations/0004_alter_queueitem_unique_together_and_more.py                           4      0   100%
+documents/migrations/0005_alter_folder_unique_together_alter_document_status.py                 4      0   100%
+documents/migrations/0006_remove_document_reviewed_by_document_file_answer_and_more.py          5      0   100%
+documents/migrations/0007_remove_document_file_answer_and_more.py                               5      0   100%
+documents/migrations/0008_remove_document_review_comment_and_more.py                            5      0   100%
+documents/migrations/0009_remove_queueitem_file_answer_and_more.py                              5      0   100%
+documents/migrations/0010_alter_document_reviewed_at_alter_queueitem_added_at_and_more.py       4      0   100%
+documents/migrations/0011_document_reviewed_by.py                                               6      0   100%
+documents/migrations/0012_documentfile.py                                                       6      0   100%
+documents/migrations/0013_documentfile_owner_alter_document_owner_and_more.py                   6      0   100%
+documents/migrations/0014_remove_document_temp_file_alter_document_file.py                      5      0   100%
+documents/migrations/0015_remove_document_file.py                                               4      0   100%
+documents/migrations/0016_alter_document_file_answer_alter_document_title_and_more.py           4      0   100%
+documents/migrations/0017_alter_queueitem_options.py                                            4      0   100%
+documents/migrations/0018_alter_document_file_answer_alter_documentfile_file_and_more.py        4      0   100%
+documents/migrations/0019_alter_document_file_answer_alter_documentfile_file_and_more.py        5      0   100%
+documents/migrations/0020_alter_document_options.py                                             4      0   100%
+documents/migrations/0021_alter_approvalqueue_title.py                                          4      0   100%
+documents/migrations/0022_alter_approvalqueue_title.py                                          4      0   100%
+documents/migrations/__init__.py                                                                0      0   100%
+documents/models.py                                                                           145     16    89%
+documents/paginators.py                                                                        13      0   100%
+documents/permissions.py                                                                       36     15    58%
+documents/serializers.py                                                                      150     29    81%
+documents/services.py                                                                         336    120    64%
+documents/signals.py                                                                            0      0   100%
+documents/tasks.py                                                                            118     28    76%
+documents/tests.py                                                                            714      9    99%
+documents/urls.py                                                                              14      0   100%
+documents/utils/file_display.py                                                                66     62     6%
+documents/validators.py                                                                        46      3    93%
+documents/views.py                                                                            226     42    81%
+manage.py                                                                                      11      2    82%
+users/__init__.py                                                                               0      0   100%
+users/admin.py                                                                                  7      0   100%
+users/apps.py                                                                                   4      0   100%
+users/management/__init__.py                                                                    0      0   100%
+users/management/commands/__init__.py                                                           0      0   100%
+users/management/commands/create_users.py                                                      71     71     0%
+users/migrations/0001_initial.py                                                                7      0   100%
+users/migrations/__init__.py                                                                    0      0   100%
+users/models.py                                                                                22      0   100%
+users/permissions.py                                                                           25      4    84%
+users/serializers.py                                                                           24      1    96%
+users/tests.py                                                                                 51      4    92%
+users/urls.py                                                                                  11      0   100%
+users/views.py                                                                                 32      3    91%
+---------------------------------------------------------------------------------------------------------------
+TOTAL                                                                                        2763    645    77%
+
+## Краткое резюме проекта: 
+
+### Концепция решения
+
+*Ключевые тезисы:
+Для пользователей 
+- максимально упрощенный процесс загрузки документов, 
+- возможность прикрепить несколько файлов к одному документу.
+Для администраторов 
+- удобный функционал проверки, одобрения/отклонения документа 
+с возможностью оставить комментарий и ответный файл
+- отклонение/одобрение документов осуществляется внутри очереди документов(!!!)
+
+Технические особенности:
+Автоматизация 
+- интеллектуальная система распределения документов по очередям 
+к наименее загруженным администраторам.
+Структура 
+- автоматическая организация хранения документов по папкам в соответствии 
+со статусом и правилами передачи в архив.
+Оптимизация 
+- автоматическое сжатие загружаемых изображений для экономии дискового 
+пространства.
+Оповещение 
+- оповещение всех участников процесса об этапах работы с документами 
+по электронной почте (админи-стратора о поступлении документа, пользователя 
+о его одобрении/отклонении.
+
+Подход:
+- Создание централизованной веб-платформы для автоматизации жизненного цикла 
+документа – от загрузки до передачи в архив.
+- Интуитивно понятный интерфейс.
+
+### Описание моделей (сущностей) проекта (приложение ‘documents’)
+Архитектура системы документооборота
+1. Папка (Folder)
+- Система категорий для автоматической сортировки документов
+- Системные папки: На рассмотрении, Одобренные, Отклоненные, Архив
+- Автоматическое создание при первом запуске
+2. Документ (Document) - ЯДРО СИСТЕМЫ
+- Основная сущность, которую загружают пользователи
+- Статусы: pending, approved, rejected, archived
+- Ответственный администратор - автоматическое назначение
+3. Файл (DocumentFile)
+- Хранение дополнительных файлов к документам
+- Поддержка множественных файлов на один документ
+4. Очередь (ApprovalQueue)
+- Механизм распределения нагрузки между администраторами
+- Каждый администратор имеет свою очередь документов на проверку
+- Одобрение/отклонение документов осуществляется внутри очереди документов (!!!)
+5. Элемент очереди (QueueItem)
+- Связь документа с очередью администратора
+- Позиция в очереди - порядок обработки
+- Черновики - временные комментарии и файлы до завершения проверки
+
+*Ключевые особенности:*
+
+Автоматизация:
+- Автоназначение администраторов
+- Автоматическая сортировка по папкам
+- Автоматическое распределение по очередям
+
+- Безопасность:
+- Разграничение прав доступа
+- Кастомные permissions для разных ролей
+- Проверка прав на каждом уровне
+
+- Workflow:
+* Пользователь загружает документ → папка "На рассмотрении"
+* Система назначает администратора → добавляет в его очередь
+* Администратор проверяет → одобряет/отклоняет, добавляет комментарий и файл
+* Документ перемещается в соответствующую папку
+* Через время → автоматически в Архив
+* Идеально для системы управления документами с ревью процессами!
+
+
+### Валидация при создании документа
+
+Многоуровневая система проверок
+1. Валидация файлов (DocumentFileValidator):
+- Проверка размера файлов (макс. 4 MB)
+- Контроль форматов и типа содержимого
+- Защита от перегрузки сервера
+
+2. Валидация текстовых полей (TitleValidator):
+- Проверка на запрещенные слова (казино, криптовалюта и т.д.)
+- Валидация символов (только буквы, цифры, дефисы)
+- Минимальная/максимальная длина полей
+- Обязательность заполнения ключевых полей
+
+Админ-панель систем документооборота
+3. Бизнес-логика валидации:
+- Уникальность slug для папок
+- Проверка прав доступа к операциям
+- Валидация статусов документов
+- Контроль целостности данных
+
+Ключевые преимущества:
+- Безопасность → Защита от спама и нежелательного контента
+- Надежность → Предотвращение ошибок ввода данных
+- Юзабилити → Четкие сообщения об ошибках для пользователей     
+
+⚡ Техническая реализация:
+- Кастомные классы-валидаторы
+- Интеграция с Django REST Framework
+
+**Docker volumes:**
+В проекте реализовано использование Docker Volumes для хранения данных 
+контейнеров. Таким образом, данные хранятся на хостовой машине (сервере)
+
+Production сценарии:
+- Развитие инфраструктуры:
+- Сейчас: Локальные volumes (простота)
+- Потом: NFS/Cloud volumes (масштабирование)
+- Distributed storage (Ceph, GlusterFS) 
+
+Что дает использование Docker Volumes
+- Надёжность - данные переживают контейнеры
+- Гибкость - легко менять инфраструктуру
+- Масштабируемость - готовность к росту
+- Удобство - встроенные инструменты управления
+
+
+### Описание модели ‘User’ (приложение ‘users’)
+
+1. Модель Пользователя (User) - Кастомизированная
+Основные особенности:
+- Замена username на email - идентификатор (более современный подход)
+- Расширенные поля - имя, фамилия, аватарка
+- Наследование от AbstractUser - все возможности Django + кастомные поля 
+Дополнительные возможности:
+- Полное имя - автоматическое свойство full_name
+- Специальные права - просмотр всех пользователей, удаление
+- Сортировка по фамилии и имени
+
+### Описание админпанели системы документооорота
+
+Админ-панель систем документооборота
+Основные сущности:
+- Документы - файлы на согласование
+- Папки - категории документов (ожидание/одобренные/отклоненные)
+- Очереди - персональные очереди администраторов
+- Элементы очереди - документы в работе
+
+Ролевая модель:
+- Суперпользователь - полный доступ ко всем данным
+- Администратор - только свои документы и очереди
+- Пользователь - загрузка документов через AP
+
+Ключевые функции админ - панели:  
+
+*Для администраторов:*
+- Просмотр персональной очереди документов
+- Одобрение/отклонение документов кнопками
+- Загрузка ответных файлов и комментариев
+- Фильтрация по статусам документа
+
+- *Для суперпользователя:*
+- Перераспределение документов между администраторами
+- Просмотр всех документов системы
+- Управление очередями администраторов
+
+- *Интерфейс:*
+- Интуитивный UX - кнопки действий в каждой строке
+- Визуализация статусов - цветовое кодирование
+- Inline-редактирование - без перехода между страницами
+- Drag-and-drop загрузка файлов
+
+
+## ИТОГИ 
+Особенности реализации
 - Кастомизированный Django Admin - глубокое переопределение стандартной админки
+- JWT-аутентификация для API,
+- tasks для email-уведомлений
 - Динамические inline-формы с кнопками действий в каждой строке
 - Автоматическая балансировка нагрузки между администраторами
 - Система очередей с приоритизацией документов

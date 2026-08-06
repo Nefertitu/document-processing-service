@@ -31,7 +31,7 @@ def send_single_document_email(document_id: int, status: str, comment: str = "")
 
         if status == "pending":
 
-            subject = "Получен документ на согласование!"
+            subject = "Ваш документ поступил на рассмотрение!"
             message = f"Документ '{document.title}' создан {document.uploaded_at}, ожидает подтверждения."
 
             result = send_mail(
